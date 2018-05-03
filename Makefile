@@ -1,6 +1,6 @@
 
 _imgtrans.so : _imgtrans.c Makefile
-	gcc -std=c99 -shared -o _imgtrans.so -fPIC -Ofast _imgtrans.c -Wall
+	gcc -std=c99 -shared -o _imgtrans.so -fPIC -O2  _imgtrans.c -Wall
 
 test:	imgtrans.py _imgtrans.so test_imgtrans.py
 	python test_imgtrans.py

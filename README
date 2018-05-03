@@ -1,0 +1,10 @@
+
+For network viewing of 8 MB 2048x2048 unsigned short images.
+
+Rebins a unsigned short array (2x2, 3x3 or 4x4)
+
+Maps values onto a char LUT (256 values)
+
+5 f.p.s raw gives about 40 MB/s to transfer and saturates network.
+
+4x4 binning + LUT gives about 1.3 MB/s that we should be OK.
