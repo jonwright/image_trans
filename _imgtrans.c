@@ -8,10 +8,12 @@
 
 char LUT[256*256];
 
-void rebin2( unsigned short input[],
+
+
+void rebin2( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
-	     char output[]) {
+	     char *restrict output){
   int odim1, odim2, io, jo, t;  
   odim1 = dim1/2;
   odim2 = dim2/2;
@@ -20,16 +22,16 @@ void rebin2( unsigned short input[],
       t = ( input[ (io*2    )*dim2 + jo*2    ] +
  	    input[ (io*2    )*dim2 + jo*2 + 1] +
 	    input[ (io*2 + 1)*dim2 + jo*2    ] +
-	    input[ (io*2 + 1)*dim2 + jo*2 + 1] ) / 4 ;
-      output[ odim2*io + jo ] = LUT[t]; 
+	    input[ (io*2 + 1)*dim2 + jo*2 + 1] );
+      output[ odim2*io + jo ] = LUT[t/4]; 
     }
   }
 }
 
-void rebin3( unsigned short input[],
+void rebin3( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
-	     char output[]) {
+	     char *restrict output) {
   int odim1, odim2, io, jo, t;  
   odim1 = dim1/3;
   odim2 = dim2/3;
@@ -43,17 +45,17 @@ void rebin3( unsigned short input[],
 	    input[ (io*3 + 1)*dim2 + jo*3 + 2] +
 	    input[ (io*3 + 2)*dim2 + jo*3    ] +
 	    input[ (io*3 + 2)*dim2 + jo*3 + 1] +
-	    input[ (io*3 + 2)*dim2 + jo*3 + 2] ) / 9 ;
-      output[ odim2*io + jo ] = LUT[t]; 
+	    input[ (io*3 + 2)*dim2 + jo*3 + 2] ) ;
+      output[ odim2*io + jo ] = LUT[t/9]; 
     }
   }
 }
 
 
-void rebin4( unsigned short input[],
+void rebin4( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
-	     char output[]) {
+	     char *restrict output) {
   int odim1, odim2, io, jo, t;  
   odim1 = dim1/4;
   odim2 = dim2/4;
@@ -74,8 +76,8 @@ void rebin4( unsigned short input[],
 	    input[ (io*4 + 3)*dim2 + jo*4    ] +
  	    input[ (io*4 + 3)*dim2 + jo*4 + 1] +
  	    input[ (io*4 + 3)*dim2 + jo*4 + 2] +
-	    input[ (io*4 + 3)*dim2 + jo*4 + 3] ) / 16;
-      output[ odim2*io + jo ] = LUT[t]; 
+	    input[ (io*4 + 3)*dim2 + jo*4 + 3] );
+      output[ odim2*io + jo ] = LUT[t/16]; 
     }
   }
 }
