@@ -1,6 +1,6 @@
 
 
-import sys, fabio, time
+import sys, fabio, time, os
 import numpy as np
 from imgtrans import *
 
@@ -105,11 +105,7 @@ def showrebins(fname):
     imshow( r4, aspect='equal'  )
     show()
 
-
-        
 if __name__=="__main__":
-
-
     if len(sys.argv)>1:
         files = sys.argv[1:]
         setLUT( 90, 60000, LOG )

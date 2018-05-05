@@ -7,6 +7,7 @@ from ctypes import POINTER, byref
 import numpy as np, zlib
 
 _imgtrans = cdll.LoadLibrary("./_imgtrans.so")
+_imgtrans = cdll.LoadLibrary("./_imgtrans_omp.so")
 
 setLUT = _imgtrans.setLUT
 setLUT.argtypes = [ c_int, c_int, c_int ]
