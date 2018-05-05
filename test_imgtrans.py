@@ -14,6 +14,7 @@ def numpy_rebin( img, out, N ):
     binned = tmp.sum(axis=3).sum(axis=1) // (N*N)
     out.flat[:] = numpy_LUT[ binned.ravel() ]
 
+    
 def testLUT():
     from pylab import plot, show, legend
     setLUT( 90, 60000, LINEAR )
@@ -27,6 +28,13 @@ def testLUT():
 
 # compare speeds:
 numpy_LUT = np.array( [ord(LUT[i]) for i in range(pow(2,16))], np.uint8 )
+
+def numpy_stats(img):
+    sm = img.sum()
+    sm2 = (img.astype(int)*img).sum()
+    mn = img.min()
+    mx = img.max()
+    return sm,sm2,mx,mn
 
 def bench( msg, f, *args ):
     start = time.time()
@@ -52,6 +60,16 @@ def showrebins(fname):
     n4 = np.zeros( (im.data.shape[0]//4,im.data.shape[1]//4), np.uint8)
 
     print( fname )
+    s0=bench( '  C sum', imgsum, im.data )
+    s1=bench( '  Numpy sum', im.data.sum )
+    s2=bench( '  C sum', imgsum, im.data )
+    assert s0==s1==s2,(s0,s1,s2)
+    stats=bench( '  C stats', imgstats, im.data )
+    nstats=bench('  numpy stats' ,numpy_stats,im.data)
+#    print(stats)
+#    print(nstats)
+    assert (stats == nstats),(stats,nstats)
+
     bench( '  C rebin2', rebin2, im.data, r2 )
     bench( '  Numpy b2', numpy_rebin, im.data, n2, 2 ) 
     o2 = bench( '  Compress2', compress,  r2 )

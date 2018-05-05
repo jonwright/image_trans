@@ -5,6 +5,8 @@
    ?   other compression
 */
 #include <math.h>
+#include <stdint.h>
+
 
 char LUT[256*256];
 
@@ -113,3 +115,30 @@ void setLUT( int minval, int maxval, int type){
   }
 }
 
+/* to estimate possible speed of reading */
+uint64_t imgsum( unsigned short *restrict im, int len){
+  uint64_t sum;
+  int i;
+  sum=0;
+  for(i=0;i<len;i++) sum += im[i];
+  return sum;
+}
+
+/* to estimate possible speed of reading */
+void imgstats( unsigned short *restrict im, int len,
+	       uint64_t *sum, uint64_t *sum2,
+	       uint16_t *mx, uint16_t *mn ){
+  unsigned int i, t;
+  t = im[0];
+  *sum = t;
+  *sum2 = t*t;
+  *mx = im[0];
+  *mn = im[0];
+  for(i=1;i<len;i++) {
+    t = im[i];
+    *sum  += t;
+    *sum2 += t * t ;
+    *mx = ( (im[i]) > (*mx) ) ? (im[i]) : (*mx);
+    *mn = ( (im[i]) < (*mn) ) ? (im[i]) : (*mn);
+  }
+}
