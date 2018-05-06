@@ -17,7 +17,7 @@ def bench_omp():
           "imgsum   min %.2f (%.2f)  mean %.2f   max %.2f ms"%(
               np.min(tsu),np.min(tsu)*i, np.mean(tsu), np.max(tsu) ),
           "imgstats min %.2f (%.2f)  mean %.2f   max %.2f ms"%(
-              np.min(tst),np.min(tsu)*i, np.mean(tst), np.max(tst) ) )
+              np.min(tst),np.min(tst)*i, np.mean(tst), np.max(tst) ) )
     
 
 if __name__=="__main__":

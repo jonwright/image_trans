@@ -6,8 +6,21 @@ from ctypes import c_int, c_void_p, c_char, cdll, c_uint64, c_uint16
 from ctypes import POINTER, byref
 import numpy as np, zlib
 
+def is_aligned(a, alignment=16):
+    return (a.ctypes.data % alignment) == 0
+
+def aligned(a, alignment=16):
+    if (a.ctypes.data % alignment) == 0:
+        return a
+    extra = alignment / a.itemsize
+    buf = np.empty(a.size + extra, dtype=a.dtype)
+    ofs = (-buf.ctypes.data % alignment) / a.itemsize
+    aa = buf[ofs:ofs+a.size].reshape(a.shape)
+    np.copyto(aa, a)
+    assert (aa.ctypes.data % alignment) == 0
+    return aa
+
 _imgtrans = cdll.LoadLibrary("./_imgtrans.so")
-_imgtrans = cdll.LoadLibrary("./_imgtrans_omp.so")
 
 setLUT = _imgtrans.setLUT
 setLUT.argtypes = [ c_int, c_int, c_int ]
@@ -39,6 +52,8 @@ def rebin2(img, out):
     assert out.shape[1] == img.shape[1]//2
     assert img.dtype == np.uint16
     assert out.dtype == np.uint8
+    assert is_aligned(img)
+    assert is_aligned(out)
     _rebin2(img.ctypes.data, img.shape[0], img.shape[1], out.ctypes.data)
 
 def rebin3(img, out):
@@ -46,6 +61,8 @@ def rebin3(img, out):
     assert out.shape[1] == img.shape[1]//3
     assert img.dtype == np.uint16
     assert out.dtype == np.uint8
+    assert is_aligned(img)
+    assert is_aligned(out)
     _rebin3(img.ctypes.data, img.shape[0], img.shape[1], out.ctypes.data)
 
 def rebin4(img, out):
@@ -53,10 +70,13 @@ def rebin4(img, out):
     assert out.shape[1] == img.shape[1]//4
     assert img.dtype == np.uint16
     assert out.dtype == np.uint8
+    assert is_aligned(img)
+    assert is_aligned(out)
     _rebin4(img.ctypes.data, img.shape[0], img.shape[1], out.ctypes.data)
 
 def imgsum(img):
     assert img.dtype == np.uint16
+    assert is_aligned(img)
     return _imgsum( img.ctypes.data, len(img.flat) )
 
 def imgstats(img):
@@ -65,6 +85,7 @@ def imgstats(img):
     sm2 = c_uint64(0)
     mx = c_uint16(0)
     mn = c_uint16(0)
+    assert is_aligned(img)
     _imgstats( img.ctypes.data, len(img.flat),
                byref( sm ),byref( sm2 ),byref( mx ),byref( mn ))
     return sm.value,sm2.value,mx.value,mn.value

@@ -3,7 +3,8 @@
 import sys, fabio, time, os
 import numpy as np
 from imgtrans import *
-
+import matplotlib
+matplotlib.use("Agg")
 def numpy_rebin( img, out, N ):
     # reshape to rebin
     global numpy_LUT
@@ -16,7 +17,7 @@ def numpy_rebin( img, out, N ):
 
     
 def testLUT():
-    from pylab import plot, show, legend
+    from pylab import plot, show, legend, savefig
     setLUT( 90, 60000, LINEAR )
     plot( [ord(LUT[i]) for i in range(pow(2,16))], "-", label="LINEAR")
     setLUT( 90, 60000, LOG )
@@ -24,8 +25,9 @@ def testLUT():
     setLUT( 90, 60000,  SQRT )
     plot( [ord(LUT[i]) for i in range(pow(2,16))], "-", label="SQRT")
     legend(loc='lower right')
-    show()
-
+    savefig("lut.png")
+    print("Wrote lut.png")
+    
 # compare speeds:
 numpy_LUT = np.array( [ord(LUT[i]) for i in range(pow(2,16))], np.uint8 )
 
@@ -36,16 +38,26 @@ def numpy_stats(img):
     mx = img.max()
     return sm,sm2,mx,mn
 
-def bench( msg, f, *args ):
+
+
+def _bench( f, *args ):
     start = time.time()
     ret = f( *args )
     end = time.time()
-    print( msg + " %.2f ms"%((end-start)*1e3) )
-    return ret
+    return (end-start)*1e3,ret
+
+
+def bench( msg, f, *args ):
+    ts = []
+    for j in range(10):
+        t,r = _bench(f, *args)
+        ts.append(t)
+    print( "%20s \t %.2f - %.2f ms"%(msg,np.min(ts),np.max(ts)) )
+    return r
     
 def showrebins(fname):
 
-    from pylab import imshow, show, subplot, title, colorbar
+    from pylab import imshow, show, subplot, title, colorbar, savefig
     import pylab
     global numpy_LUT
     # compare speeds:
@@ -103,7 +115,8 @@ def showrebins(fname):
     imshow( r3, aspect='equal' )
     subplot(224)
     imshow( r4, aspect='equal'  )
-    show()
+    savefig("pics.png")
+    print("write pics.png")
 
 if __name__=="__main__":
     if len(sys.argv)>1:
