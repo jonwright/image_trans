@@ -6,19 +6,6 @@ from ctypes import c_int, c_void_p, c_char, cdll, c_uint64, c_uint16
 from ctypes import POINTER, byref
 import numpy as np, zlib
 
-def is_aligned(a, alignment=16):
-    return (a.ctypes.data % alignment) == 0
-
-def aligned(a, alignment=16):
-    if (a.ctypes.data % alignment) == 0:
-        return a
-    extra = alignment / a.itemsize
-    buf = np.empty(a.size + extra, dtype=a.dtype)
-    ofs = (-buf.ctypes.data % alignment) / a.itemsize
-    aa = buf[ofs:ofs+a.size].reshape(a.shape)
-    np.copyto(aa, a)
-    assert (aa.ctypes.data % alignment) == 0
-    return aa
 
 _imgtrans = cdll.LoadLibrary("./_imgtrans.so")
 
@@ -46,6 +33,23 @@ _imgstats.argtypes = [ c_void_p, c_int,
                        POINTER(c_uint16) ]
 
 LUT = ( c_char*65536 ).in_dll( _imgtrans, "LUT" )
+ALIGNMENT = ( c_int ).in_dll( _imgtrans, "ALIGNMENT" ).value
+
+
+def is_aligned(a, alignment=ALIGNMENT):
+    return (a.ctypes.data % alignment) == 0
+
+def aligned(a, alignment=ALIGNMENT):
+    if (a.ctypes.data % alignment) == 0:
+        return a
+    extra = alignment / a.itemsize
+    buf = np.empty(a.size + extra, dtype=a.dtype)
+    ofs = (-buf.ctypes.data % alignment) / a.itemsize
+    aa = buf[ofs:ofs+a.size].reshape(a.shape)
+    np.copyto(aa, a)
+    assert (aa.ctypes.data % alignment) == 0
+    return aa
+
 
 def rebin2(img, out):
     assert out.shape[0] == img.shape[0]//2
