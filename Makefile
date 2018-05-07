@@ -1,6 +1,6 @@
 
 # centos5 ; grr
-CC=gcc44
+# CC=gcc44
 
 
 all : _imgtrans.so  test_simd
