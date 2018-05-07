@@ -5,6 +5,9 @@ import sys, time, os
 import numpy as np
 from imgtrans import *
 
+bvalues = []
+btitles = []
+
 def testLUT():
     from pylab import plot, show, legend, savefig
     setLUT( 90, 60000, LINEAR )
@@ -43,8 +46,6 @@ def _bench( f, *args ):
     return (end-start)*1e3,ret
 
 
-btitles = []
-bvalues = []
 def bench( msg, f, *args ):
     global btitles, bvalues
     ts = []
@@ -63,11 +64,17 @@ def testim1():
     a.shape = 2048,2048
     return a
 
-def test_rebins( ):
+def testim2():
+    c = 2048*2048/65535
+    a = (np.arange(0,2048*2048,dtype=int) / c).astype(np.uint16)
+    a.shape = 2048,2048
+    return a
+
+def test_rebins( im ):
     global numpy_LUT
     # compare speeds:
     numpy_LUT = np.array( [ord(LUT[i]) for i in range(pow(2,16))], np.uint8 )
-    im = testim1()
+    
     r2 = np.zeros( (im.shape[0]//2,im.shape[1]//2), np.uint8)
     r3 = np.zeros( (im.shape[0]//3,im.shape[1]//3), np.uint8)
     r4 = np.zeros( (im.shape[0]//4,im.shape[1]//4), np.uint8)
@@ -101,11 +108,6 @@ def test_rebins( ):
     assert (decompress( o2 ) == r2 ).all()
     assert (decompress( o3 ) == r3 ).all()
     assert (decompress( o4 ) == r4 ).all()
-
-    # print report
-    global bvalues, btitles
-    for t,v in zip(btitles, bvalues):
-        print(t,v)
     
     total = im.nbytes
     if 0:
@@ -131,5 +133,10 @@ if __name__=="__main__":
     # for a compare of speed
     numpy_LUT = np.array( [ord(LUT[i]) for i in range(pow(2,16))],
                           np.uint8 )
-    test_rebins( )
+    test_rebins( testim1() )
+    test_rebins( testim2() )
+
+    for t,v in zip(btitles, bvalues):
+        print(t,v)
+
     testLUT()

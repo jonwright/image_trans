@@ -26,7 +26,8 @@ void rebin2( unsigned short *restrict input,
   odim1 = dim1/2;
   odim2 = dim2/2;
   
-#pragma omp parallel for simd aligned(input, output, LUT: ALIGN) private(jo, t)   
+
+#pragma omp parallel for private(jo, t)   
   for( io = 0 ; io < odim1 ; io++ ){
     for( jo = 0; jo < odim2 ; jo++ ) {
       t = ( input[ (io*2    )*dim2 + jo*2    ] +
@@ -45,7 +46,7 @@ void rebin3( unsigned short *restrict input,
   int odim1, odim2, io, jo, t;  
   odim1 = dim1/3;
   odim2 = dim2/3;
-#pragma omp parallel for simd aligned(input, output, LUT: ALIGN) private(jo, t)   
+#pragma omp parallel for private(jo, t)   
   for( io = 0 ; io < odim1 ; io++ ){
     for( jo = 0; jo < odim2 ; jo++ ) {
       t = ( input[ (io*3    )*dim2 + jo*3    ] +
@@ -70,7 +71,7 @@ void rebin4( unsigned short *restrict input,
   int odim1, odim2, io, jo, t;  
   odim1 = dim1/4;
   odim2 = dim2/4;
-#pragma omp parallel for simd aligned(input, output, LUT: ALIGN) private(jo, t)   
+#pragma omp parallel for private(jo, t)   
   for( io = 0 ; io < odim1 ; io++ ){
     for( jo = 0; jo < odim2 ; jo++ ) {
       t = ( input[ (io*4    )*dim2 + jo*4    ] +
@@ -130,7 +131,7 @@ uint64_t imgsum( unsigned short *restrict im, int len){
   uint64_t s;
   int i;
   s=0;
-#pragma omp parallel for simd aligned(im:16) reduction(+:s)
+#pragma omp parallel for reduction(+:s)
   for(i=0;i<len;i++){ s += im[i]; }
   return s;
 }
@@ -140,22 +141,28 @@ void imgstats( unsigned short *restrict im, int len,
 	       uint64_t *sum, uint64_t *sum2,
 	       uint16_t *mx, uint16_t *mn ){
   unsigned int i;
-  uint64_t s, s2;
-  uint16_t x, n;
-  s=0;
-  s2=0;
-  n=65535; /* limits for uint16 */
-  x=0;
-#pragma omp parallel for simd aligned(im:ALIGN) reduction(+:s,s2), reduction(min:n),reduction(max:x)
+
+  *sum=0;
+  *sum2=0;
+  *mn=65535; /* limits for uint16 */
+  *mx=0;
+#pragma omp parallel 
+  {
+    uint64_t s=0, s2=0;
+    uint16_t x=0, n=65535;
+#pragma omp for
     for(i=0;i<len;i++){
       s  += im[i];
       s2 += im[i] * im[i] ;
       x = (im[i] > x) ? im[i] : x;
       n = (im[i] < n) ? im[i] : n;
     }
-  
-  *sum=s;
-  *sum2=s2;
-  *mx=x;
-  *mn=n;
+    #pragma omp critical
+    {
+    *sum  += s;
+    *sum2 += s2;
+    *mx = ( *mx > x ) ? *mx : x;
+    *mn = ( *mn < x ) ? *mn : x;
+    }
+  }
 }
