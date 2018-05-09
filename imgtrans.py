@@ -4,7 +4,7 @@ from __future__ import print_function , division
 from ctypes import c_int, c_void_p, c_char, cdll, c_uint64, c_uint16
 from ctypes import POINTER, byref
 import numpy as np, zlib
-import Image, cStringIO
+import Image, cStringIO, logging
 
 _imgtrans = cdll.LoadLibrary("./_imgtrans.so")
 
@@ -122,8 +122,19 @@ def to_gif_string( o ):
     return s
 
 # warm up lazy loader
-_ = to_gif_string(  np.zeros((16,16), np.uint8))
-_ = to_jpeg_string( np.zeros((16,16), np.uint8))
+try:
+    _ = to_gif_string(  np.zeros((16,16), np.uint8))
+except:
+    def to_gif_string( a):
+        logging.error("No gif encoder")
+        return a
+try:
+    _ = to_jpeg_string( np.zeros((16,16), np.uint8))
+except:
+    def to_jpeg_string( a):
+        logging.error("No jpeg encoder")
+        return a
+
 
 __all__ = ["setLUT", "LINEAR", "LOG", "SQRT", "rebin2", "rebin3", "rebin4",
            "LUT", 'imgsum', "imgstats", 'compress', 'decompress',
