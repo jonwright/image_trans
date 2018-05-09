@@ -17,6 +17,46 @@ char LUT[256*256] __attribute__((aligned(ALIGN)));
 int ALIGNMENT = ALIGN;
 
 
+void pick2( unsigned short *restrict input,
+	     int dim1,
+	     int dim2,
+	     char *restrict output){
+  int i, j;
+#pragma omp parallel for private(j)
+  for( i = 0 ; i < dim1 ; i=i+2 ){
+    for( j = 0; j < dim2 ; j=j+2 ) {
+      output[ dim2*i/2 + j/2 ] = LUT[ input[ i*dim2 + j ] ] ;
+    }
+  }
+}
+
+void pick3( unsigned short *restrict input,
+	     int dim1,
+	     int dim2,
+	     char *restrict output){
+  int i, j;
+#pragma omp parallel for private(j)
+  for( i = 0 ; i < dim1 ; i=i+3 ){
+    for( j = 0; j < dim2 ; j=j+3 ) {
+      output[ dim2*i/3 + j/3 ] = LUT[ input[ i*dim2 + j ] ] ;
+    }
+  }
+}
+
+void pick4( unsigned short *restrict input,
+	     int dim1,
+	     int dim2,
+	     char *restrict output){
+  int i, j;
+#pragma omp parallel for private(j)
+  for( i = 0 ; i < dim1 ; i=i+4 ){
+    for( j = 0; j < dim2 ; j=j+4 ) {
+      output[ dim2*i/4 + j/4 ] = LUT[ input[ i*dim2 + j ] ] ;
+    }
+  }
+}
+
+
 void rebin2( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
