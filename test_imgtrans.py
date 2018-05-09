@@ -4,6 +4,8 @@ from __future__ import print_function, division
 import sys, time, os
 import numpy as np
 from imgtrans import *
+import cStringIO
+import Image
 
 bvalues = []
 btitles = []
@@ -19,8 +21,6 @@ def testLUT():
     legend(loc='lower right')
     savefig("lut.png")
     print("Wrote lut.png")
-    
-
 
 def numpy_rebin( img, out, N ):
     # reshape to rebin
@@ -45,7 +45,6 @@ def _bench( f, *args ):
     end = time.time()
     return (end-start)*1e3,ret
 
-
 def bench( msg, f, *args ):
     global btitles, bvalues
     ts = []
@@ -54,9 +53,14 @@ def bench( msg, f, *args ):
         ts.append(t)
     btitles.append("%15s"%msg)
     #   "01234567890123
-    bvalues.append("%6.2f-%6.2fms "%(np.min(ts),np.max(ts)))
+    if hasattr(r, '__len__'):
+        if len(r)==2:
+            bvalues.append("%6.2f-%6.2fms %d"%(np.min(ts),np.max(ts),len(r[-1])))
+        else:
+            bvalues.append("%6.2f-%6.2fms %d"%(np.min(ts),np.max(ts),len(r)))
+    else:
+        bvalues.append("%6.2f-%6.2fms "%(np.min(ts),np.max(ts)))
     return r
-
 
 def testim1():
     np.random.seed(42)
@@ -81,7 +85,7 @@ def test_rebins( im ):
     n2 = np.zeros( (im.shape[0]//2,im.shape[1]//2), np.uint8)
     n3 = np.zeros( (im.shape[0]//3,im.shape[1]//3), np.uint8)
     n4 = np.zeros( (im.shape[0]//4,im.shape[1]//4), np.uint8)
-
+    
     s0=bench( 'C sum', imgsum, im )
     s1=bench( 'Numpy sum', im.sum )
     s2=bench( 'C sum', imgsum, im )
@@ -90,7 +94,7 @@ def test_rebins( im ):
     stats =bench( 'C stats', imgstats, im )
     nstats=bench('numpy stats' ,numpy_stats,im)
     assert (stats == nstats),(stats,nstats)
-
+    
     bench( '  C rebin2', rebin2, im, r2 )
     bench( '  Numpy b2', numpy_rebin, im, n2, 2 ) 
     o2= bench( '  Compress2', compress,  r2 )
@@ -100,7 +104,10 @@ def test_rebins( im ):
     bench( '  C rebin4', rebin4, im, r4 )
     bench( '  Numpy b4', numpy_rebin, im, n4, 4 ) 
     o4= bench( '  Compress4', compress,  r4 )
-
+    
+    bench( '  toGif4', to_gif_string, r4 )
+    bench( '  tojpeg4', to_jpeg_string, r4 )
+    
     assert (r2 == n2).all()
     assert (r3 == n3).all()
     assert (r4 == n4).all()
@@ -127,7 +134,6 @@ def test_rebins( im ):
         print("write pics.png")
 
 if __name__=="__main__":
-
     
     setLUT( 90, 60000, LOG )
     # for a compare of speed
@@ -135,7 +141,7 @@ if __name__=="__main__":
                           np.uint8 )
     test_rebins( testim1() )
     test_rebins( testim2() )
-
+    
     for t,v in zip(btitles, bvalues):
         print(t,v)
 

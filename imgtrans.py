@@ -1,11 +1,10 @@
 
 from __future__ import print_function , division
 
-
 from ctypes import c_int, c_void_p, c_char, cdll, c_uint64, c_uint16
 from ctypes import POINTER, byref
 import numpy as np, zlib
-
+import Image, cStringIO
 
 _imgtrans = cdll.LoadLibrary("./_imgtrans.so")
 
@@ -50,7 +49,6 @@ def aligned(a, alignment=ALIGNMENT):
     assert (aa.ctypes.data % alignment) == 0
     return aa
 
-
 def rebin2(img, out):
     assert out.shape[0] == img.shape[0]//2
     assert out.shape[1] == img.shape[1]//2
@@ -93,8 +91,6 @@ def imgstats(img):
     _imgstats( img.ctypes.data, len(img.flat),
                byref( sm ),byref( sm2 ),byref( mx ),byref( mn ))
     return sm.value,sm2.value,mx.value,mn.value
-    
-
 
 LINEAR = 0
 LOG = 1
@@ -109,7 +105,26 @@ def compress( a ):
 def decompress( o ):
     return np.fromstring( zlib.decompress( o[1] ), np.uint8 ).reshape( o[0] )
 
+def to_jpeg_string( o ):
+    i = Image.fromarray( o )
+    b = cStringIO.StringIO()
+    i.save(b, "JPEG", optimize=False, quality=95)
+    s = b.getvalue()
+    b.close()
+    return s
+
+def to_gif_string( o ):
+    i = Image.fromarray( o )
+    b = cStringIO.StringIO()
+    i.save(b, "GIF", optimize=False, quality=95)
+    s = b.getvalue()
+    b.close()
+    return s
+
+# warm up lazy loader
+_ = to_gif_string(  np.zeros((16,16), np.uint8))
+_ = to_jpeg_string( np.zeros((16,16), np.uint8))
+
 __all__ = ["setLUT", "LINEAR", "LOG", "SQRT", "rebin2", "rebin3", "rebin4",
-           "LUT", 'imgsum', "imgstats", 'compress', 'decompress' ]
-
-
+           "LUT", 'imgsum', "imgstats", 'compress', 'decompress',
+           "to_jpeg_string", "to_gif_string" ]
