@@ -1,12 +1,18 @@
 
 from __future__ import print_function, division
-import numpy as np, os, time
+import numpy as np, os, time, sys
 from imgtrans import *
 
+if sys.platform == 'win32':
+    timer = time.clock
+else:
+    timer = time.time
+
+
 def bench( f, a ):
-    start = time.time()
+    start = timer()
     f(a)
-    return (time.time()-start)*1e3
+    return (timer()-start)*1e3
 
 def bench_omp():
     ar = (np.random.random(2048*2048)*65535).astype( np.uint16 )

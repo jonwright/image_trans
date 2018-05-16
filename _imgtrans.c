@@ -6,7 +6,6 @@
 */
 #include <math.h>
 #include <stdint.h>
-
 #include <omp.h>
 
 
@@ -198,19 +197,19 @@ void imgstats( unsigned short *restrict im, int len,
 	       uint64_t *sum, uint64_t *sum2,
 	       uint16_t *mx, uint16_t *mn ){
   int i;
-
   *sum=0;
   *sum2=0;
   *mn=65535; /* limits for uint16 */
   *mx=0;
-#pragma omp parallel 
+#pragma omp parallel
   {
-    uint64_t s=0, s2=0;
+    uint64_t s=0, s2=0, t;
     uint16_t x=0, n=65535;
 #pragma omp for
     for(i=0;i<len;i++){
-      s  += im[i];
-      s2 += im[i] * im[i] ;
+      t = im[i]; // explicit cast
+      s  += t ;
+      s2 += t * t ;
       x = (im[i] > x) ? im[i] : x;
       n = (im[i] < n) ? im[i] : n;
     }
@@ -219,7 +218,7 @@ void imgstats( unsigned short *restrict im, int len,
     *sum  += s;
     *sum2 += s2;
     *mx = ( *mx > x ) ? *mx : x;
-    *mn = ( *mn < x ) ? *mn : x;
+    *mn = ( *mn < n ) ? *mn : n;
     }
   }
 }

@@ -18,7 +18,7 @@ else:
 try:
     _imgtrans = cdll.LoadLibrary("./_imgtrans.so")
 except:
-    _imgtrans = cdll.LoadLibrary("./_imgtrans.dll   ")
+    _imgtrans = cdll.LoadLibrary("_imgtrans.dll")
 
 setLUT = _imgtrans.setLUT
 setLUT.argtypes = [ c_int, c_int, c_int ]

@@ -2,20 +2,31 @@
 # centos5 ; grr
 # CC=gcc44
 
+CC = gcc
+CFLAGS = -std=c99 -shared -fopenmp  -O3 -msse4.2 -o 
 
-all : _imgtrans.so  test_simd
 
-_imgtrans.dll : _imgtrans.c
-	cl /LD /openmp /O2 _imgtrans.c
+ifeq ($(OS), Windows_NT)
+	shlib = dll
+#	CC = cl
+#	CFLAGS = /LD /openmp /O2 /OUT:
+else
+	shlib = so
+endif
+
+all : _imgtrans.$(shlib)  test_simd
+
+
+_imgtrans.$(shlib) : _imgtrans.c Makefile
+	$(CC) _imgtrans.c $(CFLAGS)_imgtrans.$(shlib)
+
 
 test_simd : test_simd.c
 	$(CC) test_simd.c -msse4.2 -Wall -std=c99 -g -fopenmp -O3 -o test_simd
 
 
-_imgtrans.so : _imgtrans.c Makefile
-	$(CC) -std=c99 -shared -fPIC -fopenmp -O3 -msse4.2 _imgtrans.c  -o _imgtrans.so
 
-test:	imgtrans.py _imgtrans.so test_imgtrans.py
+test:	imgtrans.py _imgtrans.$(shlib) test_imgtrans.py
 	python run_bench_omp.py
-	OMP_NUM_THREADS=4 python -O test_imgtrans.py 
+	python test_imgtrans.py 
 

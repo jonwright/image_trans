@@ -6,6 +6,11 @@ import numpy as np
 from imgtrans import *
 from PIL import Image
 
+if sys.platform == 'win32':
+    timer = time.clock
+else:
+    timer = time.time
+
 bvalues = []
 btitles = []
 
@@ -32,16 +37,16 @@ def numpy_rebin( img, out, N ):
     out.flat[:] = numpy_LUT[ binned.ravel() ]
 
 def numpy_stats(img):
-    sm = img.sum()
+    sm = img.astype(np.int64).sum()
     sm2 = (img.astype(np.int64)*img).sum()
     mn = img.min()
     mx = img.max()
     return sm,sm2,mx,mn
 
 def _bench( f, *args ):
-    start = time.time()
+    start = timer()
     ret = f( *args )
-    end = time.time()
+    end = timer()
     return (end-start)*1e3,ret
 
 def bench( msg, f, *args ):
@@ -65,12 +70,11 @@ def testim1():
     np.random.seed(42)
     a = np.random.random_integers(0,pow(2,16),size=2048*2048).astype( np.uint16 )
     a.shape = 2048,2048
-    return 100*np.ones((2048,2048),np.uint16)
     return a
 
 def testim2():
     c = 2048*2048/65535
-    a = (np.arange(0,2048*2048,dtype=int) / c).astype(np.uint16)
+    a = (np.arange(0,2048*2048,dtype=np.int64) / c).astype(np.uint16)
     a.shape = 2048,2048
     return a
 
