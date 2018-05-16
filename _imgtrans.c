@@ -12,11 +12,20 @@
 
 #define ALIGN 16
 
+#ifdef _MSC_VER	
+  __declspec(align(ALIGN),dllexport)	 char LUT[256*256];
+#define restrict __restrict
+#define DLL_EXPORT __declspec(dllexport)
+#else
+  char LUT[256*256] __attribute__((aligned(ALIGN)));
+#define DLL_EXPORT 
+#endif
 
-char LUT[256*256] __attribute__((aligned(ALIGN)));
+DLL_EXPORT
 int ALIGNMENT = ALIGN;
 
 
+DLL_EXPORT
 void pick2( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
@@ -30,6 +39,7 @@ void pick2( unsigned short *restrict input,
   }
 }
 
+DLL_EXPORT
 void pick3( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
@@ -43,6 +53,7 @@ void pick3( unsigned short *restrict input,
   }
 }
 
+DLL_EXPORT
 void pick4( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
@@ -56,7 +67,7 @@ void pick4( unsigned short *restrict input,
   }
 }
 
-
+DLL_EXPORT
 void rebin2( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
@@ -79,6 +90,7 @@ void rebin2( unsigned short *restrict input,
   }
 }
 
+DLL_EXPORT
 void rebin3( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
@@ -103,7 +115,7 @@ void rebin3( unsigned short *restrict input,
   }
 }
 
-
+DLL_EXPORT
 void rebin4( unsigned short *restrict input,
 	     int dim1,
 	     int dim2,
@@ -135,6 +147,8 @@ void rebin4( unsigned short *restrict input,
   }
 }
 
+
+DLL_EXPORT
 void setLUT( int minval, int maxval, int type){
   int i;
   float f,c,cm;
@@ -167,6 +181,7 @@ void setLUT( int minval, int maxval, int type){
 }
 
 /* to estimate possible speed of reading */
+DLL_EXPORT
 uint64_t imgsum( unsigned short *restrict im, int len){
   uint64_t s;
   int i;
@@ -176,11 +191,13 @@ uint64_t imgsum( unsigned short *restrict im, int len){
   return s;
 }
 
+
 /* to estimate possible speed of reading */
+DLL_EXPORT
 void imgstats( unsigned short *restrict im, int len,
 	       uint64_t *sum, uint64_t *sum2,
 	       uint16_t *mx, uint16_t *mn ){
-  unsigned int i;
+  int i;
 
   *sum=0;
   *sum2=0;

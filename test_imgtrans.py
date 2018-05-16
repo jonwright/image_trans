@@ -4,8 +4,7 @@ from __future__ import print_function, division
 import sys, time, os
 import numpy as np
 from imgtrans import *
-import cStringIO
-import Image
+from PIL import Image
 
 bvalues = []
 btitles = []
@@ -34,7 +33,7 @@ def numpy_rebin( img, out, N ):
 
 def numpy_stats(img):
     sm = img.sum()
-    sm2 = (img.astype(int)*img).sum()
+    sm2 = (img.astype(np.int64)*img).sum()
     mn = img.min()
     mx = img.max()
     return sm,sm2,mx,mn
@@ -66,6 +65,7 @@ def testim1():
     np.random.seed(42)
     a = np.random.random_integers(0,pow(2,16),size=2048*2048).astype( np.uint16 )
     a.shape = 2048,2048
+    return 100*np.ones((2048,2048),np.uint16)
     return a
 
 def testim2():
@@ -87,7 +87,7 @@ def test_rebins( im ):
     n4 = np.zeros( (im.shape[0]//4,im.shape[1]//4), np.uint8)
     
     s0=bench( 'C sum', imgsum, im )
-    s1=bench( 'Numpy sum', im.sum )
+    s1=bench( 'Numpy sum', im.astype(np.int64).sum )
     s2=bench( 'C sum', imgsum, im )
     assert s0==s1==s2,(s0,s1,s2)
     

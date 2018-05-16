@@ -5,6 +5,9 @@
 
 all : _imgtrans.so  test_simd
 
+_imgtrans.dll : _imgtrans.c
+	cl /LD /openmp /O2 _imgtrans.c
+
 test_simd : test_simd.c
 	$(CC) test_simd.c -msse4.2 -Wall -std=c99 -g -fopenmp -O3 -o test_simd
 

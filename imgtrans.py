@@ -4,9 +4,21 @@ from __future__ import print_function , division
 from ctypes import c_int, c_void_p, c_char, cdll, c_uint64, c_uint16
 from ctypes import POINTER, byref
 import numpy as np, zlib
-import Image, cStringIO, logging
+import logging
+from PIL import Image
 
-_imgtrans = cdll.LoadLibrary("./_imgtrans.so")
+import sys
+if sys.version_info[0] > 2:
+    import io
+    StringIO = io.BytesIO 
+else:
+    import cStringIO
+    StringIO = cStringIO.StringIO
+
+try:
+    _imgtrans = cdll.LoadLibrary("./_imgtrans.so")
+except:
+    _imgtrans = cdll.LoadLibrary("./_imgtrans.dll   ")
 
 setLUT = _imgtrans.setLUT
 setLUT.argtypes = [ c_int, c_int, c_int ]
@@ -107,7 +119,7 @@ def decompress( o ):
 
 def to_jpeg_string( o ):
     i = Image.fromarray( o )
-    b = cStringIO.StringIO()
+    b = StringIO()
     i.save(b, "JPEG", optimize=False, quality=95)
     s = b.getvalue()
     b.close()
@@ -115,7 +127,7 @@ def to_jpeg_string( o ):
 
 def to_gif_string( o ):
     i = Image.fromarray( o )
-    b = cStringIO.StringIO()
+    b = StringIO()
     i.save(b, "GIF", optimize=False, quality=95)
     s = b.getvalue()
     b.close()
