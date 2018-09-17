@@ -3,7 +3,7 @@
 # CC=gcc44
 
 CC = gcc
-CFLAGS = -std=c99 -shared -fopenmp  -O3 -msse4.2 -o 
+CFLAGS = -std=c99 -fPIC -shared -fopenmp  -O3 -msse4.2 -o 
 
 
 ifeq ($(OS), Windows_NT)
