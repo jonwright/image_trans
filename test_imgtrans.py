@@ -23,7 +23,7 @@ def testLUT():
     plot( [ord(LUT[i]) for i in range(pow(2,16))], "-", label="LOG")
     setLUT( 90, 30000,  SQRT )
     plot( [ord(LUT[i]) for i in range(pow(2,16))], "-", label="SQRT")
-    plot( [_logLUT(i,90) for i in range(pow(2,16))], "-", label="logLUT")
+    plot( [_logLUT(i,0) for i in range(pow(2,16))], "-", label="logLUT")
     legend(loc='lower right')
     show()
     savefig("lut.png")
