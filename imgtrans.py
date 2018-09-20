@@ -1,7 +1,7 @@
 
 from __future__ import print_function , division
 
-from ctypes import c_int, c_void_p, c_char, cdll, c_uint64, c_uint16
+from ctypes import c_int, c_void_p, c_char, cdll, c_uint64, c_uint16, c_uint8
 from ctypes import POINTER, byref
 import numpy as np, zlib
 import logging
@@ -35,6 +35,14 @@ _rebin4.argtypes = [ c_void_p, c_int, c_int, c_void_p ]
 _imgsum = _imgtrans.imgsum
 _imgsum.argtypes = [ c_void_p, c_int ]
 _imgsum.restype = c_uint64
+
+_log2s = _imgtrans.log2s
+_log2s.argtypes = [ c_uint16 ]
+_log2s.restype = c_uint8
+
+_logLUT = _imgtrans.logLUT
+_logLUT.argtypes = [ c_uint16, c_uint16 ]
+_logLUT.restype = c_uint8
 
 _imgstats = _imgtrans.imgstats
 _imgstats.argtypes = [ c_void_p, c_int,
@@ -150,4 +158,5 @@ except:
 
 __all__ = ["setLUT", "LINEAR", "LOG", "SQRT", "rebin2", "rebin3", "rebin4",
            "LUT", 'imgsum', "imgstats", 'compress', 'decompress',
-           "to_jpeg_string", "to_gif_string" ]
+           "to_jpeg_string", "to_gif_string" , "_logLUT",
+           "_log2s" ]

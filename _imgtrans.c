@@ -152,12 +152,11 @@ void setLUT( int minval, int maxval, int type){
   int i;
   float f,c,cm;
   for(i=0     ; i<=minval; i++) LUT[i]=0;
-  for(i=maxval; i<=65535; i++)LUT[i]=255;
+  for(i=maxval; i<=65535 ; i++) LUT[i]=255;
   if(type == 1){ /* log */
-    c = 255./(log(maxval)-log(minval));
-    cm = log(minval);
-    for(i=minval; i<=maxval; i++){
-      f = c*(log(i)-cm);
+    c = 255./(log(maxval-minval));
+    for(i=minval+1; i<maxval; i++){
+      f = c*log(i-minval);
       LUT[i] = (char) round(f);
     }
     return;
@@ -165,7 +164,7 @@ void setLUT( int minval, int maxval, int type){
   if( type == 2){ /* sqrt */
     c = 255./(sqrt(maxval)-sqrt(minval));
     cm = sqrt(minval);
-    for(i=minval; i<=maxval; i++){
+    for(i=minval+1; i<maxval; i++){
       f = c*(sqrt(i)-cm);
       LUT[i] = (char) round(f);
     }
@@ -173,10 +172,53 @@ void setLUT( int minval, int maxval, int type){
   }
   /* linear is the default, type == 0 etc */
   c = 255./(maxval-minval);
-  for(i=minval; i<=maxval; i++){
+  for(i=minval+1; i<maxval; i++){
     f = (i-minval)*c;
     LUT[i] = (char) round(f);
   }
+}
+
+
+
+/* Computes log2 (position of the first binary 1) */
+inline uint8_t _uint8loguint16( uint16_t x ){
+  uint8_t r = 0; // result of log2(v) will go here
+  if( x & 0xFF00 ){ x >>= 8u ; r |= 8u; }
+  if( x & 0x00F0 ){ x >>= 4u ; r |= 4u; }
+  if( x & 0x000C ){ x >>= 2u ; r |= 2u; }
+  if( x & 0x0002 ){ x >>= 1u ; r |= 1u; }
+  return r ;
+}
+
+DLL_EXPORT 
+uint8_t log2s( uint16_t x){
+    return _uint8loguint16( x );
+}
+
+inline uint8_t _log2s16( uint16_t x ){
+  uint8_t n;
+  n = _uint8loguint16( x ); // 0 -> 16
+  x -= (1u << n);
+  if ( x | 4u )
+    return ( n << 4 ) + ( x  >> (n - 4) );
+  return ( n << 4 ) + ( x  << (4 - n) );
+}
+
+
+DLL_EXPORT 
+uint8_t log2s16( uint16_t x){
+    return _log2s16( x );
+}
+
+
+DLL_EXPORT 
+uint8_t logLUT( uint16_t x, uint16_t imin ){
+  x -= imin;
+  if (x & 0xFF80) //  x>128
+    return _log2s16( x - 64 );
+  if (x & 0xFFC0) // x>64
+    return  (x >> 1) + 32;
+  return x;
 }
 
 /* to estimate possible speed of reading */

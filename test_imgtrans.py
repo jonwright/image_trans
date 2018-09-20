@@ -2,7 +2,7 @@
 from __future__ import print_function, division
 
 import sys, time, os
-import numpy as np
+import numpy as np, math
 from imgtrans import *
 from PIL import Image
 
@@ -15,17 +15,42 @@ bvalues = []
 btitles = []
 
 def testLUT():
-    from pylab import plot, show, legend, savefig
-    setLUT( 90, 60000, LINEAR )
+    from pylab import plot, show, legend, savefig, figure
+    figure()
+    setLUT( 90, 30000, LINEAR )
     plot( [ord(LUT[i]) for i in range(pow(2,16))], "-", label="LINEAR")
-    setLUT( 90, 60000, LOG )
+    setLUT( 90, 30000, LOG )
     plot( [ord(LUT[i]) for i in range(pow(2,16))], "-", label="LOG")
-    setLUT( 90, 60000,  SQRT )
+    setLUT( 90, 30000,  SQRT )
     plot( [ord(LUT[i]) for i in range(pow(2,16))], "-", label="SQRT")
+    plot( [_logLUT(i,90) for i in range(pow(2,16))], "-", label="logLUT")
     legend(loc='lower right')
+    show()
     savefig("lut.png")
     print("Wrote lut.png")
 
+def il2(x):
+    return int(np.floor(np.log2(x)))
+
+def l2(x):
+    """ in range 0,255 """
+    n = il2(x)
+    if n >= 4:
+        return (n<<4) + ((x - (1<<n))>>(n-4))
+    else:
+        return (n<<4) + ((x - (1<<n))<<(4-n))
+    
+def test_log2s():
+    def log2(x):
+        return math.log(x) / math.log(2)
+    for i in range(1,pow(2,16)):
+        i1 = _log2s( i )
+        i2 = math.floor( log2( i ) )
+        i3 = l2( i )
+        assert i1 == i2, (i,i1,i2, log2(i))
+    print("uint8loguint16 OK")
+        
+    
 def numpy_rebin( img, out, N ):
     # reshape to rebin
     global numpy_LUT
@@ -121,13 +146,14 @@ def test_rebins( im ):
     assert (decompress( o4 ) == r4 ).all()
     
     total = im.nbytes
-    if 0:
+    if 1:
         from pylab import imshow, show, subplot, title, colorbar, savefig
         import pylab
+        pylab.figure()
         pylab.spectral()
         subplot(221)
         imshow( im, aspect='equal' )
-        title( fname )
+#        title( )
         subplot(222)
         imshow( r2, aspect='equal')
         subplot(223)
@@ -136,17 +162,26 @@ def test_rebins( im ):
         imshow( r4, aspect='equal'  )
         savefig("pics.png")
         print("write pics.png")
+        show()
 
 if __name__=="__main__":
-    
     setLUT( 90, 60000, LOG )
-    # for a compare of speed
-    numpy_LUT = np.array( [ord(LUT[i]) for i in range(pow(2,16))],
-                          np.uint8 )
-    test_rebins( testim1() )
-    test_rebins( testim2() )
-    
+    if len( sys.argv) > 1:
+        import fabio
+        im = fabio.open( sys.argv[1] ).data.astype( np.uint16 )
+        test_rebins (im )
+    else:
+        test_log2s()    
+
+        # for a compare of speed
+        numpy_LUT = np.array( [ord(LUT[i]) for i in range(pow(2,16))],
+                              np.uint8 )
+        test_rebins( testim1() )
+        test_rebins( testim2() )
+        testLUT()
+        
     for t,v in zip(btitles, bvalues):
         print(t,v)
 
-    testLUT()
+
+
