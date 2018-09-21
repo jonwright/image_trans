@@ -1,5 +1,7 @@
 
 #include "il2lut.h"
+#include <assert.h>
+
 
 /* Compute the integer log2 * 16 
  *    Using log(x) = log( 2^n + (x-2^n) )
@@ -15,13 +17,11 @@
  * then 16.log2(x) 
  */
 
-uint8_t logLUT( uint16_t , uint16_t );
 
 
 
-
-inline
-uint8_t logLUT( uint16_t x, uint16_t imin ){
+static inline
+uint8_t logLUT_branch( uint16_t x, uint16_t imin ){
   uint16_t t,s;
   uint8_t n;
   x -= imin;
@@ -32,26 +32,18 @@ uint8_t logLUT( uint16_t x, uint16_t imin ){
      * see various internet articles (fls in linux kernel for int32)
      * https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
      */
-    if(0){ // OK to branch
-      n = 0;
-      if( t & 0xFF00 ){      // 1111 1111  0000 0000
-	t >>= 8u ; n |= 8u;
-      }
-      if( t & 0x00F0 ){      // 0000 0000  1111 0000
-	t >>= 4u ; n |= 4u;
-      }
-      if( t & 0x000C ){      // 0000 0000  0000 1100
-	t >>= 2u ; n |= 2u;
-      }
-      if( t & 0x0002 ){      // 0000 0000  0000 0001
-	t >>= 1u ; n |= 1u;
-      }
-    } else {
-      n = (t > 0xFFFF) << 4; t >>= n;
-      s = (t > 0xFF  ) << 3; t >>= s; n |= s;
-      s = (t > 0xF   ) << 2; t >>= s; n |= s;
-      s = (t > 0x3   ) << 1; t >>= s; n |= s;
-      n |= (t >> 1);
+    n = 0;
+    if( t & 0xFF00 ){      // 1111 1111  0000 0000
+      t >>= 8u ; n |= 8u;
+    }
+    if( t & 0x00F0 ){      // 0000 0000  1111 0000
+      t >>= 4u ; n |= 4u;
+    }
+    if( t & 0x000C ){      // 0000 0000  0000 1100
+      t >>= 2u ; n |= 2u;
+    }
+    if( t & 0x0002 ){      // 0000 0000  0000 0001
+      t >>= 1u ; n |= 1u;
     }
     /* Remainder x-2^n */
     t = x - (1u << n);
@@ -69,15 +61,215 @@ uint8_t logLUT( uint16_t x, uint16_t imin ){
 }
 
 
-void LUT( const uint16_t * restrict in,
-	  uint8_t * restrict out,
-	  uint16_t imin,
-	  int len ){
+static inline
+uint8_t logLUT_nobranch( uint16_t x, uint16_t imin ){
+  uint16_t t,s;
+  uint8_t n;
+  x -= imin;
+  if (x & 0xFF80) {  //  x>128
+    x -= 64;
+    t = x;
+    /* Computes log2(x) which is the position of the first binary 1
+     * see various internet articles (fls in linux kernel for int32)
+     * https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
+     */
+    n = (t > 0xFF  ) << 3; // n =   8       or 0
+    t >>= n;               
+    s = (t > 0xF   ) << 2; // s = t/4
+    t >>= s;
+    n |= s;
+    s = (t > 0x3   ) << 1;
+    t >>= s;
+    n |= s;
+    n |= (t >> 1);
+    /* Remainder x-2^n */
+    t = x - (1u << n);
+    /* if x >= 4 */
+    if ( n | 4u ) {
+      return (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
+    } else {
+      return (uint8_t) ( ( n << 4 ) + ( t  << (4 - n) ) );
+    }
+  }
+  if (x & 0xFFC0) { //  x > 64, so div2 and add 32
+    return  (x >> 1) + 32;
+  }
+  return x;
+}
+
+
+void LUT_linear ( const uint16_t * restrict in,
+		  uint8_t * restrict out,
+		  uint16_t imin,
+		  uint8_t shft,
+		  int len ){
+  int i;
+  assert( is_aligned( in, 16 ));
+  assert( is_aligned( out, 16 ));
+  for( i=0; i<len ; i++)
+     out[i] = (in[i] > imin) ? ((in[i]-imin) >> shft) : 0;
+}
+
+void LUT_linear_simd ( const uint16_t * restrict in,
+			 uint8_t * restrict out,
+			 uint16_t imin,
+			 uint8_t shft,
+			 int len ){
+  int i;
+  __m128i i0, i1;
+  assert( is_aligned(  in, 16));
+  assert( is_aligned( out, 16));
+
+  const __m128i vmin  = _mm_set1_epi16( imin ); 
+  const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
+				       14, 12, 10, 8, 6, 4, 2, 0);
+  for( i=0; i<len ; i=i+8){
+    // Load 8 values
+    i0 = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+    i0 = _mm_subs_epu16(  i0, vmin ); // saturating subtract
+    i0 = _mm_srli_epi16(  i0, shft ); // shift right adding zeros
+    i0 = _mm_shuffle_epi8(i0, mask0); // 0,1,2,3,4,5,6,7,x,x,x,x,x,x,x,x
+    _mm_storel_epi64( (__m128i*) &(out[i]), i0 );
+  }
+
+}
+
+void LUT_branch ( const uint16_t * restrict in,
+		  uint8_t * restrict out,
+		  uint16_t imin,
+		  int len ){
   int i;
   for( i=0 ; i < len ; i=i+4 ) {
-    out[i     ] = logLUT( in[i     ], imin );
-    out[i + 1 ] = logLUT( in[i + 1 ], imin );
-    out[i + 2 ] = logLUT( in[i + 2 ], imin );
-    out[i + 3 ] = logLUT( in[i + 3 ], imin );
+    out[i     ] = logLUT_branch( in[i     ], imin );
+    out[i + 1 ] = logLUT_branch( in[i + 1 ], imin );
+    out[i + 2 ] = logLUT_branch( in[i + 2 ], imin );
+    out[i + 3 ] = logLUT_branch( in[i + 3 ], imin );
+  }
+}
+
+
+void LUT_nobranch ( const uint16_t * restrict in,
+		    uint8_t * restrict out,
+		    uint16_t imin,
+		    int len ){
+  int i;
+  for( i=0 ; i < len ; i=i+4 ) {
+    out[i     ] = logLUT_nobranch( in[i     ], imin );
+    out[i + 1 ] = logLUT_nobranch( in[i + 1 ], imin );
+    out[i + 2 ] = logLUT_nobranch( in[i + 2 ], imin );
+    out[i + 3 ] = logLUT_nobranch( in[i + 3 ], imin );
+  }
+}
+
+void LUT_log_simd ( const uint16_t * restrict in,
+			   uint8_t * restrict out,
+			   uint16_t imin,
+			   int len ){
+  int i,j;
+  uint16_t t,s,x;
+  uint8_t n;
+  __oword i0, o1, o2, o3, v1,nv,tv,sv;
+  __m128i msk64,m;
+  assert( is_aligned(  in, 16));
+  assert( is_aligned( out, 16));
+
+  const __m128i vmin  = _mm_set1_epi16( imin );
+  const __m128i v0    = _mm_set1_epi16( 0 );
+  const __m128i v8   = _mm_set1_epi16( 8 );
+  const __m128i v32   = _mm_set1_epi16( 32 );
+  const __m128i v63  = _mm_set1_epi16( 63 );
+  const __m128i v64  = _mm_set1_epi16( 64 );
+  const __m128i vFF00  = _mm_set1_epi16( 0xFF00 );
+  v1.m128i  = _mm_set1_epi16( 0xFFFF );  
+  const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
+				       14, 12, 10, 8, 6, 4, 2, 0);
+
+ 			  
+  for( i=0 ; i < len ; i=i+8 ) {
+    i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+    i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); // saturating subtract
+
+    //  n =  (x >> 1) + 32;
+    o2.m128i = _mm_srli_epi16(  i0.m128i, 1 ); // shift right adding zeros
+    o2.m128i = _mm_adds_epu16(  o2.m128i, v32 ); // saturating add 32
+
+    // x>=64 where x is unsigned
+    // mask is 1 for gt64, 0 for less.
+    msk64 = _mm_cmpeq_epi16(
+                _mm_srli_epi16(               // shift right adding zeros
+                   _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
+    o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk64 );
+    o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0); // 0,1,2,3,4,5,6,7,x,x,x,x,x,x,x,x
+//    o3.m128i = _mm_shuffle_epi8(i0.m128i, mask0); // 0,1,2,3,4,5,6,7,x,x,x,x,x,x,x,x
+/*
+>>> format(0xFFC0,"016b")
+'1111111111000000'
+>>> format(64,"016b")
+'0000000001000000'
+>>> format(0xFF80,"016b")
+'1111111110000000'
+>>> format(127,"016b")
+'0000000001111111'
+>>> 
+
+*/
+    // subtract 64
+    o3.m128i = _mm_subs_epu16( i0.m128i, v64);
+    // n = (t > 0xFF  ) << 3; // n =   8       or 0
+    m = _mm_cmpeq_epi16( _mm_srli_epi16( _mm_and_si128( o3.m128i, vFF00), 1), v0);
+    // m is shift by 8 or shift by 0
+    nv.m128i = _mm_blendv_epi8( v8, v0, m );
+    // t = (x >> n);
+    tv.m128i = _mm_blendv_epi8( _mm_srli_epi16( o3.m128i, 8 ), o3.m128i, m );
+    //  s = (t > 0xF   ) << 2; // s = t/4
+    m = _mm_cmpeq_epi16(
+	  _mm_srli_epi16(
+	     _mm_and_si128( tv.m128i, _mm_set1_epi16( 0xFFF0 )),1),v0);
+    sv.m128i = _mm_blendv_epi8( _mm_set1_epi16(4), v0, m );
+    // t >>= s;
+    tv.m128i = _mm_blendv_epi8( _mm_srli_epi16( tv.m128i, 4 ), tv.m128i, m );
+    nv.m128i = _mm_or_si128( nv.m128i, sv.m128i);
+    // s = (t > 0x3   ) << 1;
+    
+    for( j=0; j < 8; j++){
+      x = o3.m128i_u16[j];    
+      if ((x+64) & 0xFF80) {  //  x>128
+
+       
+      /* Computes log2(x) which is the position of the first binary 1
+       * see various internet articles (fls in linux kernel for int32)
+       * https://graphics.stanford.edu/~seander/bithacks.html#IntegerLog
+       */
+      // n = (t > 0xFF  ) << 3; // n =   8       or 0
+      // n = ( (t & 0xFF00)!=0  ) << 3; // n =   8       or 0
+      n = nv.m128i_u16[j];
+//      t = tv.m128i_u16[j]; //>>= n;
+//      t = x;
+//      t = (x >> n);
+      t = tv.m128i_u16[j];
+//      s = (t > 0xF   ) << 2; // s = t/4
+      s = sv.m128i_u16[j];
+     // t >>= s;
+//      n |= s;
+      s = (t > 0x3   ) << 1;
+      t >>= s;
+      n |= s;
+      n |= (t >> 1);
+      /* Remainder x-2^n */
+      t = x - (1u << n);
+      /* if x >= 4 */
+      if ( n | 4u ) {
+	n = ( ( n << 4 ) + ( t  >> (n - 4) ) );
+	} else {
+	n = ( ( n << 4 ) + ( t  << (4 - n) ) );
+      }
+//    } else if (x & 0xFFC0) { //  x > 64, so div2 and add 32
+//	n =  (x >> 1) + 32;
+//        n = o3.m128i_u8[j];
+    } else {
+      n = o2.m128i_u8[j];
+    }
+    out[i+j]=n;//v1.m128i_u8[j];
+    }
   }
 }
