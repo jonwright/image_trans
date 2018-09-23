@@ -25,7 +25,7 @@ test_simd : test_simd.c
 	$(CC) test_simd.c -msse4.2 -Wall -std=c99 -g -fopenmp -O3 -o test_simd
 
 benchLUT : benchLUT.c il2lut.c il2lut.h benchmark.h
-	$(CC) benchLUT.c il2lut.c $(CFLAGS) benchLUT && benchLUT
+	$(CC) benchLUT.c il2lut.c $(CFLAGS) benchLUT && ./benchLUT
 
 test:	imgtrans.py _imgtrans.$(shlib) test_imgtrans.py
 	python run_bench_omp.py

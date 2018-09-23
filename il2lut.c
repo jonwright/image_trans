@@ -161,6 +161,88 @@ void LUT_nobranch ( const uint16_t * restrict in,
   }
 }
 
+
+void LUT_logfloat ( const uint16_t * restrict in,
+		    uint8_t * restrict out,
+		    uint16_t imin,
+		    int len ){
+  int i, n;
+  uint16_t x,t;
+  w4 f;
+  for( i=0 ; i < len ; i=i+1 ) {
+    x = in[i] - imin;
+    if ( x < 64u ) {
+      out[i] = x;
+    } else if ( x < 128) {
+      out[i] = (x >> 1) + 32u;
+    } else {
+      x -= 64;
+      f.single = (float) x;
+      n =  ( ( f.i32>>23 ) & 0xFF ) - 127;
+      t = x - (1u << n);
+      /* if x >= 4 */
+      if ( n | 4u ) {
+	out[i] = ( ( n << 4 ) + ( t  >> (n - 4) ) );
+      } else {
+	out[i] = ( ( n << 4 ) + ( t  << (4 - n) ) );
+      }
+    }
+  }
+}
+
+/*
+ *Sequence: 0000100110101111 0x9af
+ *table [ 0  1  2  5  3  9  6 11 15  4  8 10 14  7 13 12]
+ *def l2_deb( x ):
+    v = x
+    v = v | (v>>1)
+    v = v | (v>>2)
+    v = v | (v>>4)
+    v = v | (v>>8)
+    v = v ^ (v>>1)
+    r = ((h*v)&(0xFFFF)) >> 12
+    return r
+*/
+
+
+void LUT_logDEB   ( const uint16_t * restrict in,
+		    uint8_t * restrict out,
+		    uint16_t imin,
+		    int len ){
+  int i;
+  uint16_t x,t,h;
+  h =  0x9af;
+  uint8_t n, L[16] = { 0 , 1 , 2 , 5 , 3 , 9 , 6 ,11,
+		       15,  4 , 8, 10, 14,  7 ,13, 12 };
+  for( i=0 ; i < len ; i=i+1 ) {
+    x = in[i] - imin;
+    if ( x < 64u ) {
+      out[i] = x;
+    } else if ( x < 128) {
+      out[i] = (x >> 1) + 32u;
+    } else {
+      x -= 64;
+      t = x;
+      t = t | (t>>1);
+      t = t | (t>>2);
+      t = t | (t>>4);
+      t = t | (t>>8);
+      t = t ^ (t>>1);
+      n = L[ ((h*t)&0xFFFF) >> 12 ];
+      //      assert (n<16);
+      t = x - (1u << n);
+      /* if x >= 4 */
+      if ( n | 4u ) {
+	out[i] = ( ( n << 4 ) + ( t  >> (n - 4) ) );
+      } else {
+	out[i] = ( ( n << 4 ) + ( t  << (4 - n) ) );
+      }
+    }
+  }
+}
+
+
+
 void LUT_log_simd ( const uint16_t * restrict in,
 			   uint8_t * restrict out,
 			   uint16_t imin,

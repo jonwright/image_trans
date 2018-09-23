@@ -28,6 +28,17 @@ typedef union OWORD_ALIGNMENT __oword {
 } __oword;
 
 
+typedef union w4 {
+  float    single;
+  int8_t   i8[4];
+  int16_t  i16[2];
+  int32_t  i32; 
+  uint8_t  u8[4];
+  uint16_t u16[2];
+  uint32_t u32;
+} w4;
+
+
 
 #ifdef _MSC_VER	
 #define restrict __restrict
@@ -60,6 +71,16 @@ void LUT_linear_simd ( const uint16_t * restrict ,
 		       int  );
 
 void LUT_log_simd ( const uint16_t * restrict ,
+			 uint8_t * restrict ,
+			 uint16_t ,
+			 int );
+
+void LUT_logfloat ( const uint16_t * restrict ,
+			 uint8_t * restrict ,
+			 uint16_t ,
+			 int );
+
+void LUT_logDEB ( const uint16_t * restrict ,
 			 uint8_t * restrict ,
 			 uint16_t ,
 			 int );
