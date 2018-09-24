@@ -26,7 +26,7 @@
 
 static inline
 uint8_t logLUT_branch( uint16_t x, uint16_t imin ){
-  uint16_t t,s;
+  uint16_t t;
   uint8_t n;
   x -= imin;
   if (x & 0xFF80) {  //  x>128
@@ -120,7 +120,7 @@ void LUT_linear_simd ( const uint16_t * restrict in,
 			 uint8_t shft,
 			 int len ){
   int i;
-  __m128i i0, i1;
+  __m128i i0;
   assert( is_aligned(  in, 16));
   assert( is_aligned( out, 16));
 
@@ -197,12 +197,11 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
 			 uint8_t * restrict out,
 			 uint16_t imin,
 			 int len ){
-  int i, j;
-  uint16_t x;
-  uint8_t n, t;
-  w4 f;
+  int i;
+
   __m128i msk64, msklog;
   __oword i0, o1, o2, n1, t1, t1b, n1b;
+  
   assert( is_aligned(  in, 16));
   assert( is_aligned( out, 16));
 
@@ -336,30 +335,32 @@ void LUT_log_simd ( const uint16_t * restrict in,
   int i,j;
   uint16_t t,s,x;
   uint8_t n;
-  __oword i0, o1, o2, o3, v1,nv,tv,sv;
+  __oword i0, o2, o3,nv,tv,sv;
   __m128i msk64,m;
   assert( is_aligned(  in, 16));
   assert( is_aligned( out, 16));
 
+  // imin as a vector
   const __m128i vmin  = _mm_set1_epi16( imin );
   const __m128i v0    = _mm_set1_epi16( 0 );
   const __m128i v8   = _mm_set1_epi16( 8 );
-  const __m128i v32   = _mm_set1_epi16( 32 );
   const __m128i v63  = _mm_set1_epi16( 63 );
   const __m128i v64  = _mm_set1_epi16( 64 );
   const __m128i vFF00  = _mm_set1_epi16( 0xFF00 );
-  v1.m128i  = _mm_set1_epi16( 0xFFFF );  
+
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
 				       14, 12, 10, 8, 6, 4, 2, 0);
 
  			  
   for( i=0 ; i < len ; i=i+8 ) {
     i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
-    i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); // saturating subtract
+    // saturating subtract - remove imin 
+    i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); 
 
     //  n =  (x >> 1) + 32;
-    o2.m128i = _mm_srli_epi16(  i0.m128i, 1 ); // shift right adding zeros
-    o2.m128i = _mm_adds_epu16(  o2.m128i, v32 ); // saturating add 32
+    o2.m128i = _mm_adds_epu16(  i0.m128i, v64 ); // saturating add 32
+    o2.m128i = _mm_srli_epi16(  o2.m128i, 1 ); // shift right adding zeros
+
 
     // x>=64 where x is unsigned
     // mask is 1 for gt64, 0 for less.
