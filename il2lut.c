@@ -22,13 +22,6 @@
  */
 
 
-#ifdef LID11FRELON1
-#define DOSHUFFLE 1
-#else
-#define DOSHUFFLE 0
-#endif
-
-
 
 
 
@@ -220,8 +213,8 @@ void LUT_logfloat ( const uint16_t * restrict in,
 
 
 void LUT_logfl_simd ( const uint16_t * restrict in,
-			 uint8_t * restrict out,
-			 uint16_t imin,
+		      uint8_t * restrict out,
+		      uint16_t imin,
 		      int len, int debug ){
   int i;
 
@@ -236,8 +229,7 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
   const __m128i v63  = _mm_set1_epi16( 63 );
   const __m128i v64  = _mm_set1_epi16( 64 );
   const __m128i v127  = _mm_set1_epi16( 127 );
-  const __m128i v255  = _mm_set1_epi16( 255 );
-
+  const __m128i v255  = _mm_set1_epi16( 0xFF );
   const __m128i v0   = _mm_set1_epi16( 0 );
 
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
@@ -257,10 +249,11 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
     o2.m128i = _mm_adds_epu16(  o2.m128i, v32 );  // saturating add 32
 
     // x>=64 where x is unsigned
-    // mask is 1 for gt64, 0 for less.
+    // mask is 1 for gt64, 0 for less. 
     msk = _mm_cmpeq_epi16(
 	       _mm_srli_epi16(                   // shift right adding zeros
                    _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
+
     o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk );
 
 
@@ -275,12 +268,9 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
 
     
     // take first 4 numbers as floats
-    o1.m128  = _mm_cvtpu16_ps ( i0.m64[0] );
-
-    // LONG debug - they are in a funny order on lid11frelon1
-    //    if(debug){printf("lid11frelon1 do shuffle\n");}
-    if( DOSHUFFLE ){ o1.m128i = _mm_shuffle_epi32( o1.m128i, 78); }
-
+    // https://stackoverflow.com/questions/9161807/sse-convert-short-integer-to-float/9169454
+    o1.m128  = _mm_cvtepi32_ps( _mm_unpacklo_epi16( i0.m128i, v0));
+    
     // e = np.right_shift((b-64).view(np.uint32),np.uint8(23))-127
     // f = np.right_shift((b-64).view(np.uint32),np.uint8(15))
     // g = np.reshape( np.frombuffer( f, dtype=np.uint8 ), (len(f), 4 ))
@@ -303,9 +293,7 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
     n1.m128i = _mm_add_epi32( n1.m128i, t1.m128i );
 
     // Now the second 4
-    o1.m128  = _mm_cvtpu16_ps ( i0.m64[1] );
-
-    if( DOSHUFFLE ){ o1.m128i = _mm_shuffle_epi32( o1.m128i, 78); }
+    o1.m128  = _mm_cvtepi32_ps( _mm_unpackhi_epi16( i0.m128i, v0));
 
     i0.m128i = _mm_slli_epi32( 
 		 _mm_subs_epu8(
