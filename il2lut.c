@@ -4,7 +4,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <omp.h>
 
 
 /* Compute the integer log2 * 16 
@@ -27,6 +27,27 @@
 #else
 #define DOSHUFFLE 0
 #endif
+
+
+
+
+
+ 
+#define dbg(v)                                                 
+/*
+#define dbg(v)                                                 \
+if(debug) {						       \
+      printf("%-4s ",#v);                                      \
+      for(int k=0;k<16;k++) printf(" %02x",(v).m128i_u8[k]);   \
+      printf("\n     ");                                       \
+      for(int k=0;k<16;k++) printf(" %-4d",(v).m128i_u8[k]);   \
+      printf("\n     ");                                       \
+      for(int k=0;k<8;k++) printf(" %-8d ",(v).m128i_u16[k]);  \
+      printf("\n"); }
+*/
+
+
+
 
 static inline
 uint8_t logLUT_branch( uint16_t x, uint16_t imin ){
@@ -131,6 +152,7 @@ void LUT_linear_simd ( const uint16_t * restrict in,
   const __m128i vmin  = _mm_set1_epi16( imin ); 
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
 				       14, 12, 10, 8, 6, 4, 2, 0);
+#pragma omp parallel for private(i0)
   for( i=0; i<len ; i=i+8){
     // Load 8 values
     i0 = _mm_stream_load_si128( (__m128i *) &(in[i]) );
@@ -196,19 +218,6 @@ void LUT_logfloat ( const uint16_t * restrict in,
   }
 }
 
-#define dbg(v)							
-/*
-#define dbg(v)							\
-    if(debug) {							\
-      printf("%-4s ",#v);					\
-      for(int k=0;k<16;k++) printf(" %02x",(v).m128i_u8[k]);	\
-      printf("\n     ");					\
-      for(int k=0;k<16;k++) printf(" %-4d",(v).m128i_u8[k]);	\
-      printf("\n     ");					\
-      for(int k=0;k<8;k++) printf(" %-8d ",(v).m128i_u16[k]);	\
-      printf("\n"); }
-*/
-
 
 void LUT_logfl_simd ( const uint16_t * restrict in,
 			 uint8_t * restrict out,
@@ -216,116 +225,107 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
 		      int len, int debug ){
   int i;
 
-  __m128i msk64, msklog;
-  __oword i0, o1, o2, n1, t1, n1b;
-  __oword t1b;
+  __m128i msk;
+  __oword i0, o1, o2, n1, t1;
+
   assert( is_aligned(  in, 16));
   assert( is_aligned( out, 16));
 
   const __m128i vmin  = _mm_set1_epi16( imin );
   const __m128i v32   = _mm_set1_epi16( 32 );
   const __m128i v63  = _mm_set1_epi16( 63 );
+  const __m128i v64  = _mm_set1_epi16( 64 );
   const __m128i v127  = _mm_set1_epi16( 127 );
   const __m128i v255  = _mm_set1_epi16( 255 );
-  const __m128i v64  = _mm_set1_epi16( 64 );
+
   const __m128i v0   = _mm_set1_epi16( 0 );
 
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
   				       14, 12, 10, 8, 6, 4, 2, 0);
 
- 			  
+#pragma omp parallel for private(i0,o1,o2,n1,t1,msk)
   for( i=0 ; i < len ; i=i+8 ) {
-    
-    //    i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
-    i0.m128i = _mm_load_si128( (__m128i *) &(in[i]) );
-    dbg(i0);
+
+    // Load from memory
+    i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+
+    // Take off the minimum (saturating)
     i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); // saturating subtract
-    dbg(i0);
+
     //  n =  (x >> 1) + 32;
     o2.m128i = _mm_srli_epi16(  i0.m128i, 1 );    // shift right adding zeros
     o2.m128i = _mm_adds_epu16(  o2.m128i, v32 );  // saturating add 32
-    dbg(o2);
+
     // x>=64 where x is unsigned
     // mask is 1 for gt64, 0 for less.
-    msk64 = _mm_cmpeq_epi16(
+    msk = _mm_cmpeq_epi16(
+	       _mm_srli_epi16(                   // shift right adding zeros
+                   _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
+    o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk );
+
+
+    // Take off 64 for log part
+    i0.m128i = _mm_subs_epu16(  i0.m128i, v64 ); // saturating subtract
+
+
+    // mask is 1 for gt64, 0 for less.
+    msk = _mm_cmpeq_epi16(
                 _mm_srli_epi16(                   // shift right adding zeros
                    _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
-    o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk64 );
-    dbg(o2);
-    // mask is 1 for gt64, 0 for less.
-    msklog = _mm_cmpeq_epi16(
-                _mm_srli_epi16(                   // shift right adding zeros
-                   _mm_andnot_si128( v127,  i0.m128i ),  1), v0 );
 
-    i0.m128i = _mm_subs_epu16(  i0.m128i, v64 ); // saturating subtract
-    dbg(i0)
     
-    // take first 4 as floats
+    // take first 4 numbers as floats
     o1.m128  = _mm_cvtpu16_ps ( i0.m64[0] );
-    dbg(o1);
-    if(debug){printf("lid11frelon1 do shuffle\n");}
-    /*
->>> int('10',2),int('11',2),int('00',2),int('01',2)
-(2, 3, 0, 1)
->>> int('10110001',2)
-177
->>> 
->>> int('01001110',2)
-    */
-    if( DOSHUFFLE ){ o1.m128i = _mm_shuffle_epi32( o1.m128i, 78); }
-      
 
-    dbg(o1);
+    // LONG debug - they are in a funny order on lid11frelon1
+    //    if(debug){printf("lid11frelon1 do shuffle\n");}
+    if( DOSHUFFLE ){ o1.m128i = _mm_shuffle_epi32( o1.m128i, 78); }
+
+    // e = np.right_shift((b-64).view(np.uint32),np.uint8(23))-127
+    // f = np.right_shift((b-64).view(np.uint32),np.uint8(15))
+    // g = np.reshape( np.frombuffer( f, dtype=np.uint8 ), (len(f), 4 ))
+    //
+    // def flog(a,e,g):
+    // return np.where( a < 64, a,
+    //                 np.where( a < 128, a/2 + 32,
+    //                           e*16 + g[:,0]/16))
+
+    // integer part of exponent
     n1.m128i = _mm_slli_epi32( 
 		 _mm_subs_epu8(
 		  _mm_srli_epi32( o1.m128i, 23 ),
-		   _mm_set1_epi8( 127) )  , 4 );
-    // 0x 00 00 00 0F
-    // and 8 
-    dbg(n1);
+		  v127)  , 4 );
+    // remainder part
     t1.m128i = _mm_srli_epi32(
 		 _mm_and_si128(
 		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
-    dbg(t1);
+
     n1.m128i = _mm_add_epi32( n1.m128i, t1.m128i );
-    dbg(n1);
+
     // Now the second 4
     o1.m128  = _mm_cvtpu16_ps ( i0.m64[1] );
+
     if( DOSHUFFLE ){ o1.m128i = _mm_shuffle_epi32( o1.m128i, 78); }
-    dbg(o1);
-    n1b.m128i = _mm_slli_epi32( 
+
+    i0.m128i = _mm_slli_epi32( 
 		 _mm_subs_epu8(
 		   _mm_srli_epi32( o1.m128i, 23 ),
-		   _mm_set1_epi8( 127) )  , 4 );
-    dbg(n1b);
-    // 0x 00 00 00 0F
-    // and 8
-    t1b.m128i = _mm_srli_epi32(
-		  _mm_and_si128(
+		   v127 )  , 4 );
+    t1.m128i = _mm_srli_epi32(
+		 _mm_and_si128(
 		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
-    dbg(t1b);
-    t1b.m128i = _mm_add_epi32( n1b.m128i, t1b.m128i );
-    dbg(t1b);
-    dbg(n1);
-    n1.m128i = _mm_packs_epi32 (n1.m128i, t1b.m128i);
-    dbg(n1);
-    o2.m128i = _mm_blendv_epi8( n1.m128i, o2.m128i, msklog );    
-    dbg(o2);
-        // 0,1,2,3,4,5,6,7,x,x,x,x,x,x
+    t1.m128i = _mm_add_epi32( i0.m128i, t1.m128i );
+    
+    // Combine the first and second 4 floats
+    n1.m128i = _mm_packs_epi32 (n1.m128i, t1.m128i);
 
+    // ... pick the ones above 128
+    o2.m128i = _mm_blendv_epi8( n1.m128i, o2.m128i, msk );    
+
+    // And put into output order
     o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0);
-    dbg(o2);
-    _mm_storel_epi64( (__m128i*) &(out[i]), o2.m128i );
 
-    if(debug){
-      printf("Should be: \n");
-      for(int k=0;k<8;k++){
-	printf("%d -> %d\n",in[i+k],
-	       logLUT_branch(in[i+k], imin ));
-      }
-    }
-
-    if(debug) exit(1);
+    _mm_stream_pi( (__m64*) &(out[i]), _mm_movepi64_pi64(o2.m128i));
     
   }
 }
