@@ -104,9 +104,9 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2){
   for( i=0; i<NPX; i++) dst2[i]=0;
   start = get_time();
   for( i=0; i<10 ; i++)  
-    LUT_logfloat_simd( src, dst2, 0, NPX);
+    LUT_logfl_simd( src, dst2, 0, NPX);
   end = get_time();
-  printf("#   LUT_logfloat_simd      took    %g s\n", (end-start)/10.);
+  printf("#   LUT_logfl_simd  took    %g s\n", (end-start)/10.);
 
   j = 0;
   for( i=0; i<NPX ; i++ ){

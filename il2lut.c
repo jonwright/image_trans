@@ -2,6 +2,10 @@
 #include "il2lut.h"
 #include <assert.h>
 
+#include <stdio.h>
+#include <stdlib.h>
+
+
 
 /* Compute the integer log2 * 16 
  *    Using log(x) = log( 2^n + (x-2^n) )
@@ -189,21 +193,25 @@ void LUT_logfloat ( const uint16_t * restrict in,
 }
 
 
-void LUT_logfloat_simd ( const uint16_t * restrict in,
+void LUT_logfl_simd ( const uint16_t * restrict in,
 			 uint8_t * restrict out,
 			 uint16_t imin,
 			 int len ){
-  int i, n, j;
-  uint16_t x,t;
+  int i, j;
+  uint16_t x;
+  uint8_t n, t;
   w4 f;
-  __m128i msk64;
-    __oword i0, o1, o2;
+  __m128i msk64, msklog;
+  __oword i0, o1, o2, n1, t1, t1b, n1b;
   assert( is_aligned(  in, 16));
   assert( is_aligned( out, 16));
 
   const __m128i vmin  = _mm_set1_epi16( imin );
   const __m128i v32   = _mm_set1_epi16( 32 );
   const __m128i v63  = _mm_set1_epi16( 63 );
+  const __m128i v127  = _mm_set1_epi16( 127 );
+  const __m128i v255  = _mm_set1_epi16( 255 );
+  const __m128i v64  = _mm_set1_epi16( 64 );
   const __m128i v0   = _mm_set1_epi16( 0 );
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
 				       14, 12, 10, 8, 6, 4, 2, 0);
@@ -224,29 +232,45 @@ void LUT_logfloat_simd ( const uint16_t * restrict in,
                 _mm_srli_epi16(                   // shift right adding zeros
                    _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
     o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk64 );
-    // 0,1,2,3,4,5,6,7,x,x,x,x,x,x
-    o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0);
+
+    // mask is 1 for gt64, 0 for less.
+    msklog = _mm_cmpeq_epi16(
+                _mm_srli_epi16(                   // shift right adding zeros
+                   _mm_andnot_si128( v127,  i0.m128i ),  1), v0 );
+
+    i0.m128i = _mm_subs_epu16(  i0.m128i, v64 ); // saturating subtract
 
     
-    
-    for( j=0 ; j < 8 ; j++ ) {
-      x = i0.m128i_u16[j];
-      if(x>128){
-	x = i0.m128i_u16[j] - 64;
-	f.single = (float) x;
-	n =  ( ( f.i32>>23 ) & 0xFF ) - 127;
-	t = x - (1u << n);
-	/* if x >= 4 */
-	if ( n | 4u ) {
-	  o2.m128i_u8[j] = (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
-	  //	out[i] = ( ( n << 4 ) + ( t  >> (n - 4) ) );
-	} else {
-	  o2.m128i_u8[j] = (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
-	  // out[i] = ( ( n << 4 ) + ( t  << (4 - n) ) );
-	}
-      }
-    }
-    
+    // take first 4 as floats
+    o1.m128  = _mm_cvtpu16_ps ( i0.m64[0] );
+    n1.m128i = _mm_slli_epi32( 
+		 _mm_subs_epu8(
+		   _mm_srli_epi32( o1.m128i, 23 ),
+		   _mm_set1_epi8( 127) )  , 4 );
+    // 0x 00 00 00 0F
+    // and 8
+    t1.m128i = _mm_srli_epi32(
+		 _mm_and_si128(
+		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
+    n1.m128i = _mm_add_epi32( n1.m128i, t1.m128i );
+
+    // Now the second 4
+    o1.m128  = _mm_cvtpu16_ps ( i0.m64[1] );
+    n1b.m128i = _mm_slli_epi32( 
+		 _mm_subs_epu8(
+		   _mm_srli_epi32( o1.m128i, 23 ),
+		   _mm_set1_epi8( 127) )  , 4 );
+    // 0x 00 00 00 0F
+    // and 8
+    t1b.m128i = _mm_srli_epi32(
+		 _mm_and_si128(
+		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
+    t1b.m128i = _mm_add_epi32( n1b.m128i, t1b.m128i );
+
+    n1.m128i = _mm_packs_epi32 (n1.m128i, t1b.m128i);
+    o2.m128i = _mm_blendv_epi8( n1.m128i, o2.m128i, msklog );    
+        // 0,1,2,3,4,5,6,7,x,x,x,x,x,x
+    o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0);
     _mm_storel_epi64( (__m128i*) &(out[i]), o2.m128i );
     
   }

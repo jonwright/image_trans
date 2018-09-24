@@ -16,6 +16,8 @@
 typedef union OWORD_ALIGNMENT __oword {
   __m128i  m128i;
   __m128   m128;
+  //  __m64i   m64i[2];
+  __m64    m64[2];
   float    mf[4];
   int8_t   m128i_i8[16];
   int16_t  m128i_i16[8];
@@ -81,7 +83,7 @@ void LUT_logfloat ( const uint16_t * restrict ,
 			 int );
 
 
-void LUT_logfloat_simd ( const uint16_t * restrict ,
+void LUT_logfl_simd ( const uint16_t * restrict ,
 			 uint8_t * restrict ,
 			 uint16_t ,
 			 int );
