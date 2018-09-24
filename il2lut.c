@@ -192,16 +192,29 @@ void LUT_logfloat ( const uint16_t * restrict in,
   }
 }
 
+#define dbg(v)							
+/*
+#define dbg(v)							\
+    if(debug) {							\
+      printf("%-4s ",#v);					\
+      for(int k=0;k<16;k++) printf(" %02x",(v).m128i_u8[k]);	\
+      printf("\n     ");					\
+      for(int k=0;k<16;k++) printf(" %-4d",(v).m128i_u8[k]);	\
+      printf("\n     ");					\
+      for(int k=0;k<8;k++) printf(" %-8d ",(v).m128i_u16[k]);	\
+      printf("\n"); }
+*/
+
 
 void LUT_logfl_simd ( const uint16_t * restrict in,
 			 uint8_t * restrict out,
 			 uint16_t imin,
-			 int len ){
+		      int len, int debug ){
   int i;
 
   __m128i msk64, msklog;
-  __oword i0, o1, o2, n1, t1, t1b, n1b;
-  
+  __oword i0, o1, o2, n1, t1, n1b;
+  __oword t1b;
   assert( is_aligned(  in, 16));
   assert( is_aligned( out, 16));
 
@@ -212,65 +225,103 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
   const __m128i v255  = _mm_set1_epi16( 255 );
   const __m128i v64  = _mm_set1_epi16( 64 );
   const __m128i v0   = _mm_set1_epi16( 0 );
+
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
-				       14, 12, 10, 8, 6, 4, 2, 0);
+  				       14, 12, 10, 8, 6, 4, 2, 0);
 
  			  
   for( i=0 ; i < len ; i=i+8 ) {
     
-    i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+    //    i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+    i0.m128i = _mm_load_si128( (__m128i *) &(in[i]) );
+    dbg(i0);
     i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); // saturating subtract
-
+    dbg(i0);
     //  n =  (x >> 1) + 32;
     o2.m128i = _mm_srli_epi16(  i0.m128i, 1 );    // shift right adding zeros
     o2.m128i = _mm_adds_epu16(  o2.m128i, v32 );  // saturating add 32
-
+    dbg(o2);
     // x>=64 where x is unsigned
     // mask is 1 for gt64, 0 for less.
     msk64 = _mm_cmpeq_epi16(
                 _mm_srli_epi16(                   // shift right adding zeros
                    _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
     o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk64 );
-
+    dbg(o2);
     // mask is 1 for gt64, 0 for less.
     msklog = _mm_cmpeq_epi16(
                 _mm_srli_epi16(                   // shift right adding zeros
                    _mm_andnot_si128( v127,  i0.m128i ),  1), v0 );
 
     i0.m128i = _mm_subs_epu16(  i0.m128i, v64 ); // saturating subtract
-
+    dbg(i0)
     
     // take first 4 as floats
     o1.m128  = _mm_cvtpu16_ps ( i0.m64[0] );
+    dbg(o1);
+    if(debug){printf("lid11frelon1 do shuffle\n");}
+    /*
+>>> int('10',2),int('11',2),int('00',2),int('01',2)
+(2, 3, 0, 1)
+>>> int('10110001',2)
+177
+>>> 
+>>> int('01001110',2)
+    */
+    o1.m128i = _mm_shuffle_epi32( o1.m128i, 78);
+      
+
+    dbg(o1);
     n1.m128i = _mm_slli_epi32( 
 		 _mm_subs_epu8(
-		   _mm_srli_epi32( o1.m128i, 23 ),
+		  _mm_srli_epi32( o1.m128i, 23 ),
 		   _mm_set1_epi8( 127) )  , 4 );
     // 0x 00 00 00 0F
-    // and 8
+    // and 8 
+    dbg(n1);
     t1.m128i = _mm_srli_epi32(
 		 _mm_and_si128(
 		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
+    dbg(t1);
     n1.m128i = _mm_add_epi32( n1.m128i, t1.m128i );
-
+    dbg(n1);
     // Now the second 4
     o1.m128  = _mm_cvtpu16_ps ( i0.m64[1] );
+    o1.m128i = _mm_shuffle_epi32( o1.m128i, 78);
+    dbg(o1);
     n1b.m128i = _mm_slli_epi32( 
 		 _mm_subs_epu8(
 		   _mm_srli_epi32( o1.m128i, 23 ),
 		   _mm_set1_epi8( 127) )  , 4 );
+    dbg(n1b);
     // 0x 00 00 00 0F
     // and 8
     t1b.m128i = _mm_srli_epi32(
-		 _mm_and_si128(
+		  _mm_and_si128(
 		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
+    dbg(t1b);
     t1b.m128i = _mm_add_epi32( n1b.m128i, t1b.m128i );
-
+    dbg(t1b);
+    dbg(n1);
     n1.m128i = _mm_packs_epi32 (n1.m128i, t1b.m128i);
+    dbg(n1);
     o2.m128i = _mm_blendv_epi8( n1.m128i, o2.m128i, msklog );    
+    dbg(o2);
         // 0,1,2,3,4,5,6,7,x,x,x,x,x,x
+
     o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0);
+    dbg(o2);
     _mm_storel_epi64( (__m128i*) &(out[i]), o2.m128i );
+
+    if(debug){
+      printf("Should be: \n");
+      for(int k=0;k<8;k++){
+	printf("%d -> %d\n",in[i+k],
+	       logLUT_branch(in[i+k], imin ));
+      }
+    }
+
+    if(debug) exit(1);
     
   }
 }
