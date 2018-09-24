@@ -22,7 +22,11 @@
  */
 
 
-
+#ifdef LID11FRELON1
+#define DOSHUFFLE 1
+#else
+#define DOSHUFFLE 0
+#endif
 
 static inline
 uint8_t logLUT_branch( uint16_t x, uint16_t imin ){
@@ -268,7 +272,7 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
 >>> 
 >>> int('01001110',2)
     */
-    o1.m128i = _mm_shuffle_epi32( o1.m128i, 78);
+    if( DOSHUFFLE ){ o1.m128i = _mm_shuffle_epi32( o1.m128i, 78); }
       
 
     dbg(o1);
@@ -287,7 +291,7 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
     dbg(n1);
     // Now the second 4
     o1.m128  = _mm_cvtpu16_ps ( i0.m64[1] );
-    o1.m128i = _mm_shuffle_epi32( o1.m128i, 78);
+    if( DOSHUFFLE ){ o1.m128i = _mm_shuffle_epi32( o1.m128i, 78); }
     dbg(o1);
     n1b.m128i = _mm_slli_epi32( 
 		 _mm_subs_epu8(
