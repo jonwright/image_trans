@@ -166,8 +166,9 @@ void LUT_logfloat ( const uint16_t * restrict in,
 		    uint8_t * restrict out,
 		    uint16_t imin,
 		    int len ){
-  int i, n;
-  uint16_t x,t;
+  int i;
+  uint16_t x;
+  uint8_t t, n;
   w4 f;
   for( i=0 ; i < len ; i=i+1 ) {
     x = in[i] - imin;
@@ -178,15 +179,76 @@ void LUT_logfloat ( const uint16_t * restrict in,
     } else {
       x -= 64;
       f.single = (float) x;
-      n =  ( ( f.i32>>23 ) & 0xFF ) - 127;
-      t = x - (1u << n);
-      /* if x >= 4 */
-      if ( n | 4u ) {
-	out[i] = ( ( n << 4 ) + ( t  >> (n - 4) ) );
-      } else {
-	out[i] = ( ( n << 4 ) + ( t  << (4 - n) ) );
+      // Exponent
+      n =  (( ( f.i32 >> 23  ) & 0xFF ) - 127) << 4;
+      // Mantissa, range 0->255
+      t =  ((uint8_t)(f.i32 >> 15 ) )>> 4 ;
+      out[i] = n + t ;
+    }
+  }
+}
+
+
+void LUT_logfloat_simd ( const uint16_t * restrict in,
+			 uint8_t * restrict out,
+			 uint16_t imin,
+			 int len ){
+  int i, n, j;
+  uint16_t x,t;
+  w4 f;
+  __m128i msk64;
+    __oword i0, o1, o2;
+  assert( is_aligned(  in, 16));
+  assert( is_aligned( out, 16));
+
+  const __m128i vmin  = _mm_set1_epi16( imin );
+  const __m128i v32   = _mm_set1_epi16( 32 );
+  const __m128i v63  = _mm_set1_epi16( 63 );
+  const __m128i v0   = _mm_set1_epi16( 0 );
+  const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
+				       14, 12, 10, 8, 6, 4, 2, 0);
+
+ 			  
+  for( i=0 ; i < len ; i=i+8 ) {
+    
+    i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+    i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); // saturating subtract
+
+    //  n =  (x >> 1) + 32;
+    o2.m128i = _mm_srli_epi16(  i0.m128i, 1 );    // shift right adding zeros
+    o2.m128i = _mm_adds_epu16(  o2.m128i, v32 );  // saturating add 32
+
+    // x>=64 where x is unsigned
+    // mask is 1 for gt64, 0 for less.
+    msk64 = _mm_cmpeq_epi16(
+                _mm_srli_epi16(                   // shift right adding zeros
+                   _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
+    o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk64 );
+    // 0,1,2,3,4,5,6,7,x,x,x,x,x,x
+    o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0);
+
+    
+    
+    for( j=0 ; j < 8 ; j++ ) {
+      x = i0.m128i_u16[j];
+      if(x>128){
+	x = i0.m128i_u16[j] - 64;
+	f.single = (float) x;
+	n =  ( ( f.i32>>23 ) & 0xFF ) - 127;
+	t = x - (1u << n);
+	/* if x >= 4 */
+	if ( n | 4u ) {
+	  o2.m128i_u8[j] = (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
+	  //	out[i] = ( ( n << 4 ) + ( t  >> (n - 4) ) );
+	} else {
+	  o2.m128i_u8[j] = (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
+	  // out[i] = ( ( n << 4 ) + ( t  << (4 - n) ) );
+	}
       }
     }
+    
+    _mm_storel_epi64( (__m128i*) &(out[i]), o2.m128i );
+    
   }
 }
 

@@ -39,7 +39,9 @@ def l2(x):
         return (n<<4) + ((x - (1<<n))>>(n-4))
     else:
         return (n<<4) + ((x - (1<<n))<<(4-n))
+
     
+
 def test_log2s():
     def log2(x):
         return math.log(x) / math.log(2)
@@ -49,7 +51,31 @@ def test_log2s():
         i3 = l2( i )
         assert i1 == i2, (i,i1,i2, log2(i))
     print("uint8loguint16 OK")
-        
+
+def pylogLUT(i):
+    check = _logLUT(i,0)
+    if i < 64:
+        return i
+    if i < 128:
+        return i//2 + 32
+    t = i - 64
+    n = il2(t)
+    t = t - (1 << n)
+    if ( n >= 4 ):
+        v = (n * 16) + (t >> (n-4))
+        return v
+    else:
+        v = ( n * 16) + (t << (4-n)) 
+    return v
+
+def testlogLUT():
+    for i in range((1<<16)):
+        check = _logLUT(i,0)
+        py = pylogLUT(i)
+    print("_logLUT in c matches to logLUT in python")
+    
+
+    
     
 def numpy_rebin( img, out, N ):
     # reshape to rebin
@@ -166,6 +192,7 @@ def test_rebins( im ):
 
 if __name__=="__main__":
     setLUT( 90, 60000, LOG )
+    testlogLUT()
     if len( sys.argv) > 1:
         import fabio
         im = fabio.open( sys.argv[1] ).data.astype( np.uint16 )

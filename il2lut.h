@@ -80,6 +80,13 @@ void LUT_logfloat ( const uint16_t * restrict ,
 			 uint16_t ,
 			 int );
 
+
+void LUT_logfloat_simd ( const uint16_t * restrict ,
+			 uint8_t * restrict ,
+			 uint16_t ,
+			 int );
+
+
 void LUT_logDEB ( const uint16_t * restrict ,
 			 uint8_t * restrict ,
 			 uint16_t ,
