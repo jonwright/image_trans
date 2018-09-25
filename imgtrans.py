@@ -141,6 +141,14 @@ def to_gif_string( o ):
     b.close()
     return s
 
+def to_png_string( o ):
+    i = Image.fromarray( o )
+    b = StringIO()
+    i.save(b, "PNG", optimize=False, quality=95)
+    s = b.getvalue()
+    b.close()
+    return s
+
 # warm up lazy loader
 try:
     _ = to_gif_string(  np.zeros((16,16), np.uint8))
@@ -154,9 +162,15 @@ except:
     def to_jpeg_string( a):
         logging.error("No jpeg encoder")
         return a
+try:
+    _ = to_png_string( np.zeros((16,16), np.uint8))
+except:
+    def to_png_string( a):
+        logging.error("No jpeg encoder")
+        return a
 
 
 __all__ = ["setLUT", "LINEAR", "LOG", "SQRT", "rebin2", "rebin3", "rebin4",
            "LUT", 'imgsum', "imgstats", 'compress', 'decompress',
-           "to_jpeg_string", "to_gif_string" , "_logLUT",
+           "to_jpeg_string", "to_gif_string","to_png_string" , "_logLUT",
            "_log2s" ]

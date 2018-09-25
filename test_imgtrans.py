@@ -109,10 +109,14 @@ def bench( msg, f, *args ):
     btitles.append("%15s"%msg)
     #   "01234567890123
     if hasattr(r, '__len__'):
+        
         if len(r)==2:
-            bvalues.append("%6.2f-%6.2fms %d"%(np.min(ts),np.max(ts),len(r[-1])))
+            cmprs = r[-1]
         else:
-            bvalues.append("%6.2f-%6.2fms %d"%(np.min(ts),np.max(ts),len(r)))
+            cmprs = r
+        bvalues.append("%6.2f-%6.2fms out:%d in:%d %.2f %%"%(
+            np.min(ts),np.max(ts),len(cmprs),args[0].nbytes,
+            100*len(cmprs)/args[0].nbytes))
     else:
         bvalues.append("%6.2f-%6.2fms "%(np.min(ts),np.max(ts)))
     return r
@@ -162,6 +166,7 @@ def test_rebins( im ):
     
     bench( '  toGif4', to_gif_string, r4 )
     bench( '  tojpeg4', to_jpeg_string, r4 )
+    bench( '  topng4', to_png_string, r4 )
     
     assert (r2 == n2).all()
     assert (r3 == n3).all()
