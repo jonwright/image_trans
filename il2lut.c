@@ -22,9 +22,6 @@
  */
 
 
-
-
-
  
 #define dbg(v)                                                 
 /*
@@ -38,6 +35,117 @@ if(debug) {						       \
       for(int k=0;k<8;k++) printf(" %-8d ",(v).m128i_u16[k]);  \
       printf("\n"); }
 */
+
+
+
+
+
+
+
+
+void LUT_linear ( const uint16_t * restrict in,
+		  uint8_t * restrict out,
+		  uint16_t imin,
+		  uint8_t shft,
+		  uint16_t *mini,
+		  uint16_t *maxi,
+		  int len ){
+  int i;
+  assert( is_aligned( in, 16 ));
+  assert( is_aligned( out, 16 ));
+  *mini = 65535;
+  *maxi = 0;
+  for( i=0; i<len ; i++){
+     out[i] = (in[i] > imin) ? ((in[i]-imin) >> shft) : 0;
+     *mini = (*mini < in[i]) ? (*mini) : in[i];
+     *maxi = (*maxi > in[i]) ? (*maxi) : in[i];
+  }
+}
+
+void LUT_linear_simd ( const uint16_t * restrict in,
+		       uint8_t * restrict out,
+		       uint16_t imin,
+		       uint8_t shft,
+		       uint16_t *mini,
+		       uint16_t *maxi,
+		       int len ){
+
+
+  assert( is_aligned(  in, 16));
+  assert( is_aligned( out, 16));
+
+  const __m128i vmin  = _mm_set1_epi16( imin ); 
+  const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
+				       14, 12, 10, 8, 6, 4, 2, 0);
+
+  __oword imgmin, imgmax;
+  imgmin.m128i = _mm_set1_epi16( 0xFFFF );
+  imgmax.m128i = _mm_set1_epi16( 0x0000 );
+  
+#pragma omp parallel
+  {
+    __m128i inmax, inmin, i0;
+  inmin = _mm_set1_epi16( 0xFFFF );
+  inmax = _mm_set1_epi16( 0x0000 );
+  int id  = omp_get_thread_num();
+  int num = omp_get_num_threads();
+  for( int i = (id*len)/num ; i  < ((id+1)*len)/num ; i=i+8){
+    // Load 8 values
+    i0 = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+    inmax = _mm_max_epu16( i0, inmax);
+    inmin = _mm_min_epu16( i0, inmin);
+    i0 = _mm_subs_epu16(  i0, vmin ); // saturating subtract
+    i0 = _mm_srli_epi16(  i0, shft ); // shift right adding zeros
+    i0 = _mm_shuffle_epi8(i0, mask0); // 0,1,2,3,4,5,6,7,x,x,x,x,x,x,x,x
+    _mm_stream_pi( (__m64*) &(out[i]), _mm_movepi64_pi64(i0) );
+  } // endfor
+
+  #pragma omp critical
+  {
+    imgmin.m128i = _mm_min_epu16( inmin, imgmin.m128i );
+    imgmax.m128i = _mm_max_epu16( inmax, imgmax.m128i );
+  } // endcritical
+  
+} // endparallel
+
+  
+  (*mini) = imgmin.m128i_u16[0];
+  (*maxi) = imgmax.m128i_u16[0];  
+  for( int i = 1; i < 8; i++ ){
+    *mini = (*mini < imgmin.m128i_u16[i]) ? (*mini) : imgmin.m128i_u16[i];
+    *maxi = (*maxi > imgmax.m128i_u16[i]) ? (*maxi) : imgmax.m128i_u16[i];
+  }
+}
+
+
+
+
+
+
+static inline
+uint8_t logLUT_simple( uint16_t x, uint16_t imin ){
+  /* Simple example to illustrate how the coded LUT should work */
+  uint16_t t;
+  uint8_t n;
+  x -= imin;
+  if( x <= 64 ){
+    return (uint8_t) x;
+  }
+  if( x <= 128 ){
+    return (uint8_t) x/2 + 32;
+  }
+  // log2 x part : subtract 64 to match at 128:
+  x -= 64;
+  n = 0;
+  t = x;
+  while( t >>= 1) {
+    n++;
+  }
+  // remainder after removing 2^n
+  t = x - (1 << n);
+  // minimal value for n here is 7, since 128 = 2^7
+  return (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
+}
 
 
 
@@ -69,12 +177,8 @@ uint8_t logLUT_branch( uint16_t x, uint16_t imin ){
     }
     /* Remainder x-2^n */
     t = x - (1u << n);
-    /* if x >= 4 */
-    if ( n | 4u ) {
-      return (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
-    } else {
-      return (uint8_t) ( ( n << 4 ) + ( t  << (4 - n) ) );
-    }
+    /* if x >= 4  == always true*/
+    return (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
   }
   if (x & 0xFFC0) { //  x > 64, so div2 and add 32
     return  (x >> 1) + 32;
@@ -106,12 +210,8 @@ uint8_t logLUT_nobranch( uint16_t x, uint16_t imin ){
     n |= (t >> 1);
     /* Remainder x-2^n */
     t = x - (1u << n);
-    /* if x >= 4 */
-    if ( n | 4u ) {
-      return (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
-    } else {
-      return (uint8_t) ( ( n << 4 ) + ( t  << (4 - n) ) );
-    }
+    /* if x >= 4 == always true */
+    return (uint8_t) ( ( n << 4 ) + ( t  >> (n - 4) ) );
   }
   if (x & 0xFFC0) { //  x > 64, so div2 and add 32
     return  (x >> 1) + 32;
@@ -119,43 +219,19 @@ uint8_t logLUT_nobranch( uint16_t x, uint16_t imin ){
   return x;
 }
 
-
-void LUT_linear ( const uint16_t * restrict in,
+void LUT_simple ( const uint16_t * restrict in,
 		  uint8_t * restrict out,
 		  uint16_t imin,
-		  uint8_t shft,
 		  int len ){
   int i;
-  assert( is_aligned( in, 16 ));
-  assert( is_aligned( out, 16 ));
-  for( i=0; i<len ; i++)
-     out[i] = (in[i] > imin) ? ((in[i]-imin) >> shft) : 0;
-}
-
-void LUT_linear_simd ( const uint16_t * restrict in,
-			 uint8_t * restrict out,
-			 uint16_t imin,
-			 uint8_t shft,
-			 int len ){
-  int i;
-  __m128i i0;
-  assert( is_aligned(  in, 16));
-  assert( is_aligned( out, 16));
-
-  const __m128i vmin  = _mm_set1_epi16( imin ); 
-  const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
-				       14, 12, 10, 8, 6, 4, 2, 0);
-#pragma omp parallel for private(i0)
-  for( i=0; i<len ; i=i+8){
-    // Load 8 values
-    i0 = _mm_stream_load_si128( (__m128i *) &(in[i]) );
-    i0 = _mm_subs_epu16(  i0, vmin ); // saturating subtract
-    i0 = _mm_srli_epi16(  i0, shft ); // shift right adding zeros
-    i0 = _mm_shuffle_epi8(i0, mask0); // 0,1,2,3,4,5,6,7,x,x,x,x,x,x,x,x
-    _mm_storel_epi64( (__m128i*) &(out[i]), i0 );
+  for( i=0 ; i < len ; i=i+4 ) {
+    out[i     ] = logLUT_simple( in[i     ], imin );
+    out[i + 1 ] = logLUT_simple( in[i + 1 ], imin );
+    out[i + 2 ] = logLUT_simple( in[i + 2 ], imin );
+    out[i + 3 ] = logLUT_simple( in[i + 3 ], imin );
   }
-
 }
+
 
 void LUT_branch ( const uint16_t * restrict in,
 		  uint8_t * restrict out,
@@ -195,7 +271,7 @@ void LUT_logfloat ( const uint16_t * restrict in,
   w4 f;
   for( i=0 ; i < len ; i=i+1 ) {
     x = in[i] - imin;
-    if ( x < 64u ) {
+    if ( x < 64 ) { 
       out[i] = x;
     } else if ( x < 128) {
       out[i] = (x >> 1) + 32u;
@@ -205,7 +281,7 @@ void LUT_logfloat ( const uint16_t * restrict in,
       // Exponent
       n =  (( ( f.i32 >> 23  ) & 0xFF ) - 127) << 4;
       // Mantissa, range 0->255
-      t =  ((uint8_t)(f.i32 >> 15 ) )>> 4 ;
+      t =  ((uint8_t)(f.i32 >> 15 ) ) >> 4 ;
       out[i] = n + t ;
     }
   }
@@ -231,7 +307,6 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
   const __m128i v127  = _mm_set1_epi16( 127 );
   const __m128i v255  = _mm_set1_epi16( 0xFF );
   const __m128i v0   = _mm_set1_epi16( 0 );
-
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
   				       14, 12, 10, 8, 6, 4, 2, 0);
 

@@ -55,6 +55,12 @@ void LUT_branch( const uint16_t * restrict ,
 		 uint16_t ,
 		 int  );
 
+void LUT_simple( const uint16_t * restrict ,
+		   uint8_t * restrict ,
+		   uint16_t ,
+		   int  );
+
+
 void LUT_nobranch( const uint16_t * restrict ,
 		   uint8_t * restrict ,
 		   uint16_t ,
@@ -64,12 +70,16 @@ void LUT_linear ( const uint16_t * restrict ,
 		  uint8_t * restrict ,
 		  uint16_t ,
 		  uint8_t ,
+		  uint16_t *,
+		  uint16_t *,
 		  int  );
 
 void LUT_linear_simd ( const uint16_t * restrict ,
 		       uint8_t * restrict ,
 		       uint16_t ,
 		       uint8_t ,
+		       uint16_t *,
+		       uint16_t *,
 		       int  );
 
 void LUT_log_simd ( const uint16_t * restrict ,
