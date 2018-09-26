@@ -78,17 +78,20 @@ void LUT_linear_simd ( const uint16_t * restrict in,
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
 				       14, 12, 10, 8, 6, 4, 2, 0);
 
-  __oword imgmin, imgmax;
-  imgmin.m128i = _mm_set1_epi16( 0xFFFF );
-  imgmax.m128i = _mm_set1_epi16( 0x0000 );
-  
+  omp_set_num_threads(NTMAX);
+  __oword imgmin[NTMAX], imgmax[NTMAX];
+  for(int i = 0; i<NTMAX; i++){
+    imgmin[i].m128i = _mm_set1_epi16( 0xFFFF );
+    imgmax[i].m128i = _mm_set1_epi16( 0x0000 );
+  }
+
 #pragma omp parallel 
   {
     __m128i inmax, inmin, i0;
   inmin = _mm_set1_epi16( 0xFFFF );
   inmax = _mm_set1_epi16( 0x0000 );
   int id  = omp_get_thread_num();
-  int num = omp_get_num_threads();
+  int num = omp_get_num_threads();  
   // block size : must be aligned to memory for writes
   // len is 16*8 for writes
   int blck = len/16/num;
@@ -108,18 +111,25 @@ void LUT_linear_simd ( const uint16_t * restrict in,
 
   #pragma omp critical
   {
-    imgmin.m128i = _mm_min_epu16( inmin, imgmin.m128i );
-    imgmax.m128i = _mm_max_epu16( inmax, imgmax.m128i );
+    imgmin[id].m128i = _mm_min_epu16( inmin, imgmin[id].m128i );
+    imgmax[id].m128i = _mm_max_epu16( inmax, imgmax[id].m128i );
   } // endcritical
   
 } // endparallel
 
-  
-  (*mini) = imgmin.m128i_u16[0];
-  (*maxi) = imgmax.m128i_u16[0];  
+  for(int i=1; i<NTMAX; i++){
+    imgmin[0].m128i =  _mm_min_epu16( imgmin[0].m128i, imgmin[i].m128i );
+    imgmax[0].m128i =  _mm_max_epu16( imgmax[0].m128i, imgmax[i].m128i );
+  }
+
+
+  (*mini) = imgmin[0].m128i_u16[0];
+  (*maxi) = imgmax[0].m128i_u16[0];  
   for( int i = 1; i < 8; i++ ){
-    *mini = (*mini < imgmin.m128i_u16[i]) ? (*mini) : imgmin.m128i_u16[i];
-    *maxi = (*maxi > imgmax.m128i_u16[i]) ? (*maxi) : imgmax.m128i_u16[i];
+    *mini = (*mini < imgmin[0].m128i_u16[i]) ? 
+      (*mini) : imgmin[0].m128i_u16[i];
+    *maxi = (*maxi > imgmax[0].m128i_u16[i]) ? 
+      (*maxi) : imgmax[0].m128i_u16[i];
   }
 }
 

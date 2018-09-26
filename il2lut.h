@@ -4,6 +4,11 @@
 #include <smmintrin.h>
 #include <emmintrin.h>
 
+#ifndef NTMAX
+// Max threads to use - we dont want too many...
+#define NTMAX 8
+#endif
+
 #define is_aligned(POINTER, BYTE_COUNT) \
     (((uintptr_t)(const void *)(POINTER)) % (BYTE_COUNT) == 0)
 

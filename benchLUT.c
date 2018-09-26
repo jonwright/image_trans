@@ -9,12 +9,15 @@
 
 #define NPX 2048*2048
 
+#include <omp.h>
+
 void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
   int i, j, k;
   uint8_t shift;
   uint16_t vmin, imgmin, imgmax, trumax, trumin;
   double start, end;
   uint8_t *dst3;
+
 
   trumax = src[0];
   trumin = src[0];
@@ -25,6 +28,10 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
 
   
   dst3 = (uint8_t  *) malloc( sizeof( uint8_t ) * NPX );
+
+  /* Warm up openmp creating threads here */
+  #pragma omp parallel for
+  for( i = 0; i<NPX; i++) dst3[i]=0;
 
   vmin  = 123;
   shift = 2;
@@ -43,8 +50,9 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
   for( i=0; i<NPX; i++) dst2[i]=42;
 
   start = get_time();
-  for( i=0; i<10 ; i++)  
+  for( i=0; i<10 ; i++)
     LUT_linear_simd(src, dst2, vmin, shift, &imgmin, &imgmax, NPX);
+  
   end = get_time();
   printf("#   LUT_linear_simd took    %g s", (end-start)/10.);
 
