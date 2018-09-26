@@ -82,14 +82,20 @@ void LUT_linear_simd ( const uint16_t * restrict in,
   imgmin.m128i = _mm_set1_epi16( 0xFFFF );
   imgmax.m128i = _mm_set1_epi16( 0x0000 );
   
-#pragma omp parallel
+#pragma omp parallel 
   {
     __m128i inmax, inmin, i0;
   inmin = _mm_set1_epi16( 0xFFFF );
   inmax = _mm_set1_epi16( 0x0000 );
   int id  = omp_get_thread_num();
   int num = omp_get_num_threads();
-  for( int i = (id*len)/num ; i  < ((id+1)*len)/num ; i=i+8){
+  // block size : must be aligned to memory for writes
+  // len is 16*8 for writes
+  int blck = len/16/num;
+  int start = id*blck*16;
+  int end = ( id == (num-1) ) ? len : start + blck*16;
+
+  for( int i = start ; i  < end ; i=i+8){
     // Load 8 values
     i0 = _mm_stream_load_si128( (__m128i *) &(in[i]) );
     inmax = _mm_max_epu16( i0, inmax);
