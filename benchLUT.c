@@ -40,6 +40,7 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
     printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
   }
 	  
+  for( i=0; i<NPX; i++) dst2[i]=42;
 
   start = get_time();
   for( i=0; i<10 ; i++)  
@@ -56,7 +57,7 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
   
   j = 0;
   for( i=0; i<NPX ; i++ ){
-    if(dst1[i] != dst2[i])j++;
+    if(dst1[i] != dst2[i]) j++;
   }
   if (j != 0){ printf("#  %d errors\n",j); }
   
@@ -67,7 +68,7 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
   end = get_time();
   printf("#   LUT_branch      took    %g s\n", (end-start)/10.);
   
-  for( i=0; i<NPX; i++) dst2[i]=0;
+  for( i=0; i<NPX; i++) dst2[i]=42;
 
 
 start = get_time();  
@@ -82,7 +83,7 @@ start = get_time();
   }
   if (j != 0){ printf("%d errors\n",j); }
   
-  for( i=0; i<NPX; i++) dst2[i]=0;
+  for( i=0; i<NPX; i++) dst2[i]=42;
   
   
   start = get_time();
@@ -99,7 +100,7 @@ start = get_time();
   if (j != 0){ printf("%d errors\n",j); }
 
 
-  for( i=0; i<NPX; i++) dst2[i]=0;
+  for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
     LUT_log_simd( src, dst2, 0, NPX);
@@ -113,7 +114,7 @@ start = get_time();
   if (j != 0){ printf("%d errors\n",j); }
 
 
-  for( i=0; i<NPX; i++) dst2[i]=0;
+  for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
     LUT_logfloat( src, dst2, 0, NPX);
@@ -126,7 +127,7 @@ start = get_time();
   }
   if (j != 0){ printf("%d errors\n",j); }
 
-  for( i=0; i<NPX; i++) dst2[i]=0;
+  for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
     LUT_logDEB( src, dst2, 0, NPX);
@@ -139,7 +140,7 @@ start = get_time();
   }
   if (j != 0){ printf("%d errors\n",j); }
 
-  for( i=0; i<NPX; i++) dst2[i]=0;
+  for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
     LUT_logfl_simd( src, dst2, 0, NPX, debug);
