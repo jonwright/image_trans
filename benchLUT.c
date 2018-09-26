@@ -35,12 +35,13 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
 
   vmin  = 123;
   shift = 2;
-  
+  imgmin=42;
+  imgmax=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
     LUT_linear( src, dst1, vmin, shift, &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_linear      took    %g s", (end-start)/10.);
+  printf("#   LUT_linear      took    %.7g s", (end-start)/10.);
   if( (trumax == imgmax) && (trumin == imgmin)){
     printf(" min/max OK\n");
   } else {
@@ -48,13 +49,15 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
   }
 	  
   for( i=0; i<NPX; i++) dst2[i]=42;
+  imgmin=42;
+  imgmax=42;
 
   start = get_time();
   for( i=0; i<10 ; i++)
     LUT_linear_simd(src, dst2, vmin, shift, &imgmin, &imgmax, NPX);
   
   end = get_time();
-  printf("#   LUT_linear_simd took    %g s", (end-start)/10.);
+  printf("#   LUT_linear_simd took    %.7g s", (end-start)/10.);
 
   if( (trumax == imgmax) && (trumin == imgmin)){
     printf(" min/max OK\n");
@@ -69,22 +72,37 @@ void bench( uint16_t *src, uint8_t *dst1, uint8_t *dst2, int debug){
   }
   if (j != 0){ printf("#  %d errors\n",j); }
   
-  
+  imgmin=42;
+  imgmax=42;
+
   start = get_time();  
   for( i=0; i<10 ; i++)
-    LUT_branch( src, dst1, 0, NPX);
+    LUT_branch( src, dst1, 0,  &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_branch      took    %g s\n", (end-start)/10.);
-  
+  printf("#   LUT_branch      took    %.7g s", (end-start)/10.);
+  if( (trumax == imgmax) && (trumin == imgmin)){
+    printf(" min/max OK\n");
+  } else {
+    printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
+  }
+
   for( i=0; i<NPX; i++) dst2[i]=42;
 
+  imgmin=42;
+  imgmax=42;
 
-start = get_time();  
+  start = get_time();  
   for( i=0; i<10 ; i++)
-    LUT_simple( src, dst2, 0, NPX);
+    LUT_simple( src, dst2, 0,  &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_simple      took    %g s\n", (end-start)/10.);
+  printf("#   LUT_simple      took    %.7g s", (end-start)/10.);
   j = 0;
+  if( (trumax == imgmax) && (trumin == imgmin)){
+    printf(" min/max OK\n");
+  } else {
+    printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
+  }
+
   for( i=0; i<NPX ; i++ ){
     if(dst1[i] != dst2[i])j++;
     dst3[i] = dst1[i];
@@ -92,13 +110,22 @@ start = get_time();
   if (j != 0){ printf("%d errors\n",j); }
   
   for( i=0; i<NPX; i++) dst2[i]=42;
-  
+  imgmin=42;
+  imgmax=42;
+
   
   start = get_time();
   for( i=0; i<10 ; i++)  
-    LUT_nobranch( src, dst2, 0, NPX);
+    LUT_nobranch( src, dst2, 0,  &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_nobranch    took    %g s\n", (end-start)/10.);
+  printf("#   LUT_nobranch    took    %.7g s", (end-start)/10.);
+  if( (trumax == imgmax) && (trumin == imgmin)){
+    printf(" min/max OK\n");
+  } else {
+    printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
+  }
+  imgmin=42;
+  imgmax=42;
 
   j = 0;
   for( i=0; i<NPX ; i++ ){
@@ -111,49 +138,75 @@ start = get_time();
   for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
-    LUT_log_simd( src, dst2, 0, NPX);
+    LUT_log_simd( src, dst2, 0,  &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_log_simd    took    %g s\n", (end-start)/10.);
+  printf("#   LUT_log_simd    took    %.7g s", (end-start)/10.);
+  if( (trumax == imgmax) && (trumin == imgmin)){
+    printf(" min/max OK\n");
+  } else {
+    printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
+  }
 
   j = 0;
   for( i=0; i<NPX ; i++ ){
     if(dst1[i] != dst2[i])j++;
   }
   if (j != 0){ printf("%d errors\n",j); }
+  imgmin=42;
+  imgmax=42;
 
 
   for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
-    LUT_logfloat( src, dst2, 0, NPX);
+    LUT_logfloat( src, dst2, 0,  &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_logfloat    took    %g s\n", (end-start)/10.);
+  printf("#   LUT_logfloat    took    %.7g s", (end-start)/10.);
+  if( (trumax == imgmax) && (trumin == imgmin)){
+    printf(" min/max OK\n");
+  } else {
+    printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
+  }
 
   j = 0;
   for( i=0; i<NPX ; i++ ){
     if(dst1[i] != dst2[i])j++;
   }
   if (j != 0){ printf("%d errors\n",j); }
+  imgmin=42;
+  imgmax=42;
 
   for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
-    LUT_logDEB( src, dst2, 0, NPX);
+    LUT_logDEB( src, dst2, 0,  &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_logDEB      took    %g s\n", (end-start)/10.);
+  printf("#   LUT_logDEB      took    %.7g s", (end-start)/10.);
+  if( (trumax == imgmax) && (trumin == imgmin)){
+    printf(" min/max OK\n");
+  } else {
+    printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
+  }
 
   j = 0;
   for( i=0; i<NPX ; i++ ){
     if(dst1[i] != dst2[i])j++;
   }
   if (j != 0){ printf("%d errors\n",j); }
+  imgmin=42;
+  imgmax=42;
 
   for( i=0; i<NPX; i++) dst2[i]=42;
   start = get_time();
   for( i=0; i<10 ; i++)  
-    LUT_logfl_simd( src, dst2, 0, NPX, debug);
+    LUT_logfl_simd( src, dst2, 0,  &imgmin, &imgmax, NPX);
   end = get_time();
-  printf("#   LUT_logfl_simd  took    %g s\n", (end-start)/10.);
+  printf("#   LUT_logfl_simd  took    %.7g s", (end-start)/10.);
+  if( (trumax == imgmax) && (trumin == imgmin)){
+    printf(" min/max OK\n");
+  } else {
+    printf(" min: %d vs %d   max: %d vs %d\n",trumin,imgmin,trumax,imgmax);
+  }
 
   j = 0;
   k = 0;

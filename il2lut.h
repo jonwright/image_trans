@@ -58,17 +58,23 @@ typedef union w4 {
 void LUT_branch( const uint16_t * restrict ,
 		 uint8_t * restrict ,
 		 uint16_t ,
+		 uint16_t *,
+		 uint16_t *,
 		 int  );
 
 void LUT_simple( const uint16_t * restrict ,
-		   uint8_t * restrict ,
-		   uint16_t ,
-		   int  );
+		 uint8_t * restrict ,
+		 uint16_t ,
+		 uint16_t *,
+		 uint16_t *,
+		 int  );
 
 
 void LUT_nobranch( const uint16_t * restrict ,
 		   uint8_t * restrict ,
 		   uint16_t ,
+		   uint16_t *,
+		   uint16_t *,
 		   int  );
 
 void LUT_linear ( const uint16_t * restrict ,
@@ -90,21 +96,30 @@ void LUT_linear_simd ( const uint16_t * restrict ,
 void LUT_log_simd ( const uint16_t * restrict ,
 			 uint8_t * restrict ,
 			 uint16_t ,
+		      uint16_t *,
+		      uint16_t *,
+
 			 int );
 
 void LUT_logfloat ( const uint16_t * restrict ,
-			 uint8_t * restrict ,
-			 uint16_t ,
-			 int );
+		    uint8_t * restrict ,
+		    uint16_t ,
+		    uint16_t *,
+		    uint16_t *,
+		    int );
 
 
 void LUT_logfl_simd ( const uint16_t * restrict ,
-			 uint8_t * restrict ,
-			 uint16_t ,
-		      int, int );
+		      uint8_t * restrict ,
+		      uint16_t ,
+		      uint16_t *,
+		      uint16_t *,
+		      int );
 
 
 void LUT_logDEB ( const uint16_t * restrict ,
-			 uint8_t * restrict ,
-			 uint16_t ,
-			 int );
+		  uint8_t * restrict ,
+		  uint16_t ,
+		  uint16_t *,
+		  uint16_t *,
+		  int );

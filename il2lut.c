@@ -53,8 +53,8 @@ void LUT_linear ( const uint16_t * restrict in,
   int i;
   assert( is_aligned( in, 16 ));
   assert( is_aligned( out, 16 ));
-  *mini = 65535;
-  *maxi = 0;
+  *mini = in[0];
+  *maxi = in[0];
   for( i=0; i<len ; i++){
      out[i] = (in[i] > imin) ? ((in[i]-imin) >> shft) : 0;
      *mini = (*mini < in[i]) ? (*mini) : in[i];
@@ -238,13 +238,16 @@ uint8_t logLUT_nobranch( uint16_t x, uint16_t imin ){
 void LUT_simple ( const uint16_t * restrict in,
 		  uint8_t * restrict out,
 		  uint16_t imin,
+		  uint16_t *mini,
+		  uint16_t *maxi,
 		  int len ){
   int i;
-  for( i=0 ; i < len ; i=i+4 ) {
+  *mini = in[0];
+  *maxi = in[0];
+  for( i=0 ; i < len ; i=i+1 ) {
     out[i     ] = logLUT_simple( in[i     ], imin );
-    out[i + 1 ] = logLUT_simple( in[i + 1 ], imin );
-    out[i + 2 ] = logLUT_simple( in[i + 2 ], imin );
-    out[i + 3 ] = logLUT_simple( in[i + 3 ], imin );
+     *mini = (*mini < in[i]) ? (*mini) : in[i];
+     *maxi = (*maxi > in[i]) ? (*maxi) : in[i];
   }
 }
 
@@ -252,13 +255,16 @@ void LUT_simple ( const uint16_t * restrict in,
 void LUT_branch ( const uint16_t * restrict in,
 		  uint8_t * restrict out,
 		  uint16_t imin,
+		  uint16_t *mini,
+		  uint16_t *maxi,
 		  int len ){
   int i;
-  for( i=0 ; i < len ; i=i+4 ) {
+  *mini = in[0];
+  *maxi = in[0];
+  for( i=0 ; i < len ; i=i+1 ) {
     out[i     ] = logLUT_branch( in[i     ], imin );
-    out[i + 1 ] = logLUT_branch( in[i + 1 ], imin );
-    out[i + 2 ] = logLUT_branch( in[i + 2 ], imin );
-    out[i + 3 ] = logLUT_branch( in[i + 3 ], imin );
+     *mini = (*mini < in[i]) ? (*mini) : in[i];
+     *maxi = (*maxi > in[i]) ? (*maxi) : in[i];
   }
 }
 
@@ -266,13 +272,16 @@ void LUT_branch ( const uint16_t * restrict in,
 void LUT_nobranch ( const uint16_t * restrict in,
 		    uint8_t * restrict out,
 		    uint16_t imin,
+		    uint16_t *mini,
+		    uint16_t *maxi,
 		    int len ){
   int i;
-  for( i=0 ; i < len ; i=i+4 ) {
+  *mini = in[0];
+  *maxi = in[0];  
+  for( i=0 ; i < len ; i=i+1 ) {
     out[i     ] = logLUT_nobranch( in[i     ], imin );
-    out[i + 1 ] = logLUT_nobranch( in[i + 1 ], imin );
-    out[i + 2 ] = logLUT_nobranch( in[i + 2 ], imin );
-    out[i + 3 ] = logLUT_nobranch( in[i + 3 ], imin );
+     *mini = (*mini < in[i]) ? (*mini) : in[i];
+     *maxi = (*maxi > in[i]) ? (*maxi) : in[i];
   }
 }
 
@@ -280,13 +289,20 @@ void LUT_nobranch ( const uint16_t * restrict in,
 void LUT_logfloat ( const uint16_t * restrict in,
 		    uint8_t * restrict out,
 		    uint16_t imin,
+		    uint16_t *mini,
+		    uint16_t *maxi,
 		    int len ){
   int i;
   uint16_t x;
   uint8_t t, n;
   w4 f;
+  *mini = in[0];
+  *maxi = in[0];  
   for( i=0 ; i < len ; i=i+1 ) {
     x = in[i] - imin;
+     *mini = (*mini < in[i]) ? (*mini) : in[i];
+     *maxi = (*maxi > in[i]) ? (*maxi) : in[i];
+
     if ( x < 64 ) { 
       out[i] = x;
     } else if ( x < 128) {
@@ -307,7 +323,9 @@ void LUT_logfloat ( const uint16_t * restrict in,
 void LUT_logfl_simd ( const uint16_t * restrict in,
 		      uint8_t * restrict out,
 		      uint16_t imin,
-		      int len, int debug ){
+		      uint16_t *mini,
+		      uint16_t *maxi,
+		      int len ){
   int i;
 
   __m128i msk;
@@ -427,13 +445,21 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
 void LUT_logDEB   ( const uint16_t * restrict in,
 		    uint8_t * restrict out,
 		    uint16_t imin,
+		    uint16_t *mini,
+		    uint16_t *maxi,
 		    int len ){
   int i;
   uint16_t x,t,h;
   h =  0x9af;
   uint8_t n, L[16] = { 0 , 1 , 2 , 5 , 3 , 9 , 6 ,11,
 		       15,  4 , 8, 10, 14,  7 ,13, 12 };
+  *mini = in[0];
+  *maxi = in[0];  
+
   for( i=0 ; i < len ; i=i+1 ) {
+     *mini = (*mini < in[i]) ? (*mini) : in[i];
+     *maxi = (*maxi > in[i]) ? (*maxi) : in[i];
+
     x = in[i] - imin;
     if ( x < 64u ) {
       out[i] = x;
@@ -463,9 +489,11 @@ void LUT_logDEB   ( const uint16_t * restrict in,
 
 
 void LUT_log_simd ( const uint16_t * restrict in,
-			   uint8_t * restrict out,
-			   uint16_t imin,
-			   int len ){
+		    uint8_t * restrict out,
+		    uint16_t imin,
+		    uint16_t *mini,
+		    uint16_t *maxi,		  
+		    int len ){
   int i,j;
   uint16_t t,s,x;
   uint8_t n;
