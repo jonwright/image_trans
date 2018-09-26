@@ -326,10 +326,9 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
 		      uint16_t *mini,
 		      uint16_t *maxi,
 		      int len ){
-  int i;
 
-  __m128i msk;
-  __oword i0, o1, o2, n1, t1;
+  
+
 
   assert( is_aligned(  in, 16));
   assert( is_aligned( out, 16));
@@ -344,95 +343,145 @@ void LUT_logfl_simd ( const uint16_t * restrict in,
   const __m128i mask0 = _mm_set_epi8(128, 128, 128, 128, 128, 128, 128, 128,
   				       14, 12, 10, 8, 6, 4, 2, 0);
 
-#pragma omp parallel for private(i0,o1,o2,n1,t1,msk)
-  for( i=0 ; i < len ; i=i+8 ) {
+  omp_set_num_threads(NTMAX);
+  __oword imgmin[NTMAX], imgmax[NTMAX];
+  for(int i = 0; i<NTMAX; i++){
+    imgmin[i].m128i = _mm_set1_epi16( 0xFFFF );
+    imgmax[i].m128i = _mm_set1_epi16( 0x0000 );
+  }
 
-    // Load from memory
-    i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+#pragma omp parallel 
+  {
 
-    // Take off the minimum (saturating)
-    i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); // saturating subtract
+    __m128i msk;
+    __oword i0, o1, o2, n1, t1;
 
-    //  n =  (x >> 1) + 32;
-    o2.m128i = _mm_srli_epi16(  i0.m128i, 1 );    // shift right adding zeros
-    o2.m128i = _mm_adds_epu16(  o2.m128i, v32 );  // saturating add 32
+    __m128i inmax, inmin;
+    inmin = _mm_set1_epi16( 0xFFFF );
+    inmax = _mm_set1_epi16( 0x0000 );
+    int id  = omp_get_thread_num();
+    int num = omp_get_num_threads();  
+    // block size : must be aligned to memory for writes
+    // len is 16*8 for writes
+    int blck = len/16/num;
+    int start = id*blck*16;
+    int end = ( id == (num-1) ) ? len : start + blck*16;
 
-    // x>=64 where x is unsigned
-    // mask is 1 for gt64, 0 for less. 
-    msk = _mm_cmpeq_epi16(
-	       _mm_srli_epi16(                   // shift right adding zeros
-                   _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
+    for( int i = start ; i  < end ; i=i+8){
 
-    o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk );
+      // Load from memory
+      i0.m128i = _mm_stream_load_si128( (__m128i *) &(in[i]) );
+      
+      // log the max / min
+      inmax = _mm_max_epu16( i0.m128i, inmax);
+      inmin = _mm_min_epu16( i0.m128i, inmin);
+
+      // Take off the minimum (saturating)
+      i0.m128i = _mm_subs_epu16(  i0.m128i, vmin ); // saturating subtract
+      
+      //  n =  (x >> 1) + 32;
+      o2.m128i = _mm_srli_epi16(  i0.m128i, 1 );    // shift right adding zeros
+      o2.m128i = _mm_adds_epu16(  o2.m128i, v32 );  // saturating add 32
+      
+      // x>=64 where x is unsigned
+      // mask is 1 for gt64, 0 for less. 
+      msk = _mm_cmpeq_epi16(
+			    _mm_srli_epi16(                   // shift right adding zeros
+					   _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
+      
+      o2.m128i = _mm_blendv_epi8( o2.m128i, i0.m128i, msk );
+      
+      
+      // Take off 64 for log part
+      i0.m128i = _mm_subs_epu16(  i0.m128i, v64 ); // saturating subtract
+      
+      
+      // mask is 1 for gt64, 0 for less.
+      msk = _mm_cmpeq_epi16(
+			    _mm_srli_epi16(                   // shift right adding zeros
+					   _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
+      
+      
+      // take first 4 numbers as floats
+      // https://stackoverflow.com/questions/9161807/sse-convert-short-integer-to-float/9169454
+      o1.m128  = _mm_cvtepi32_ps( _mm_unpacklo_epi16( i0.m128i, v0));
+      
+      // e = np.right_shift((b-64).view(np.uint32),np.uint8(23))-127
+      // f = np.right_shift((b-64).view(np.uint32),np.uint8(15))
+      // g = np.reshape( np.frombuffer( f, dtype=np.uint8 ), (len(f), 4 ))
+      //
+      // def flog(a,e,g):
+      // return np.where( a < 64, a,
+      //                 np.where( a < 128, a/2 + 32,
+      //                           e*16 + g[:,0]/16))
+      
+      // integer part of exponent
+      n1.m128i = _mm_slli_epi32( 
+				_mm_subs_epu8(
+					      _mm_srli_epi32( o1.m128i, 23 ),
+					      v127)  , 4 );
+      // remainder part
+      t1.m128i = _mm_srli_epi32(
+				_mm_and_si128(
+					      _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
+      
+      n1.m128i = _mm_add_epi32( n1.m128i, t1.m128i );
+      
+      // Now the second 4
+      o1.m128  = _mm_cvtepi32_ps( _mm_unpackhi_epi16( i0.m128i, v0));
+      
+      i0.m128i = _mm_slli_epi32( 
+				_mm_subs_epu8(
+					      _mm_srli_epi32( o1.m128i, 23 ),
+					      v127 )  , 4 );
+      t1.m128i = _mm_srli_epi32(
+				_mm_and_si128(
+					      _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
+      t1.m128i = _mm_add_epi32( i0.m128i, t1.m128i );
+      
+      // Combine the first and second 4 floats
+      n1.m128i = _mm_packs_epi32 (n1.m128i, t1.m128i);
+      
+      // ... pick the ones above 128
+      o2.m128i = _mm_blendv_epi8( n1.m128i, o2.m128i, msk );    
+      
+      // And put into output order
+      o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0);
+      
+      _mm_stream_pi( (__m64*) &(out[i]), _mm_movepi64_pi64(o2.m128i));
+
+  } // endfor
+
+  #pragma omp critical
+  {
+    imgmin[id].m128i = _mm_min_epu16( inmin, imgmin[id].m128i );
+    imgmax[id].m128i = _mm_max_epu16( inmax, imgmax[id].m128i );
+  } // endcritical
+  
+} // endparallel
+
+  for(int i=1; i<NTMAX; i++){
+    imgmin[0].m128i =  _mm_min_epu16( imgmin[0].m128i, imgmin[i].m128i );
+    imgmax[0].m128i =  _mm_max_epu16( imgmax[0].m128i, imgmax[i].m128i );
+  }
 
 
-    // Take off 64 for log part
-    i0.m128i = _mm_subs_epu16(  i0.m128i, v64 ); // saturating subtract
-
-
-    // mask is 1 for gt64, 0 for less.
-    msk = _mm_cmpeq_epi16(
-                _mm_srli_epi16(                   // shift right adding zeros
-                   _mm_andnot_si128( v63,  i0.m128i ),  1), v0 );
-
-    
-    // take first 4 numbers as floats
-    // https://stackoverflow.com/questions/9161807/sse-convert-short-integer-to-float/9169454
-    o1.m128  = _mm_cvtepi32_ps( _mm_unpacklo_epi16( i0.m128i, v0));
-    
-    // e = np.right_shift((b-64).view(np.uint32),np.uint8(23))-127
-    // f = np.right_shift((b-64).view(np.uint32),np.uint8(15))
-    // g = np.reshape( np.frombuffer( f, dtype=np.uint8 ), (len(f), 4 ))
-    //
-    // def flog(a,e,g):
-    // return np.where( a < 64, a,
-    //                 np.where( a < 128, a/2 + 32,
-    //                           e*16 + g[:,0]/16))
-
-    // integer part of exponent
-    n1.m128i = _mm_slli_epi32( 
-		 _mm_subs_epu8(
-		  _mm_srli_epi32( o1.m128i, 23 ),
-		  v127)  , 4 );
-    // remainder part
-    t1.m128i = _mm_srli_epi32(
-		 _mm_and_si128(
-		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
-
-    n1.m128i = _mm_add_epi32( n1.m128i, t1.m128i );
-
-    // Now the second 4
-    o1.m128  = _mm_cvtepi32_ps( _mm_unpackhi_epi16( i0.m128i, v0));
-
-    i0.m128i = _mm_slli_epi32( 
-		 _mm_subs_epu8(
-		   _mm_srli_epi32( o1.m128i, 23 ),
-		   v127 )  , 4 );
-    t1.m128i = _mm_srli_epi32(
-		 _mm_and_si128(
-		   _mm_srli_epi32( o1.m128i, 15 ), v255 ), 4);
-    t1.m128i = _mm_add_epi32( i0.m128i, t1.m128i );
-    
-    // Combine the first and second 4 floats
-    n1.m128i = _mm_packs_epi32 (n1.m128i, t1.m128i);
-
-    // ... pick the ones above 128
-    o2.m128i = _mm_blendv_epi8( n1.m128i, o2.m128i, msk );    
-
-    // And put into output order
-    o2.m128i = _mm_shuffle_epi8(o2.m128i, mask0);
-
-    _mm_stream_pi( (__m64*) &(out[i]), _mm_movepi64_pi64(o2.m128i));
-    
+  (*mini) = imgmin[0].m128i_u16[0];
+  (*maxi) = imgmax[0].m128i_u16[0];  
+  for( int i = 1; i < 8; i++ ){
+    *mini = (*mini < imgmin[0].m128i_u16[i]) ? 
+      (*mini) : imgmin[0].m128i_u16[i];
+    *maxi = (*maxi > imgmax[0].m128i_u16[i]) ? 
+      (*maxi) : imgmax[0].m128i_u16[i];
   }
 }
-
-/*
- *Sequence: 0000100110101111 0x9af
- *table [ 0  1  2  5  3  9  6 11 15  4  8 10 14  7 13 12]
- *def l2_deb( x ):
-    v = x
-    v = v | (v>>1)
+  
+  /*
+   *Sequence: 0000100110101111 0x9af
+   *table [ 0  1  2  5  3  9  6 11 15  4  8 10 14  7 13 12]
+   *def l2_deb( x ):
+   v = x
+   v = v | (v>>1)
     v = v | (v>>2)
     v = v | (v>>4)
     v = v | (v>>8)
