@@ -14,12 +14,14 @@ else
 	shlib = so
 endif
 
-all : _imgtrans.$(shlib)  test_simd benchLUT
+all : _imgtrans.$(shlib)  test_simd benchLUT _img_simple.$(shlib)
 
 
 _imgtrans.$(shlib) : _imgtrans.c Makefile
 	$(CC) _imgtrans.c -shared $(CFLAGS)_imgtrans.$(shlib)
 
+_img_simple.$(shlib) : img_simple.py
+	python img_simple.py
 
 test_simd : test_simd.c
 	$(CC) test_simd.c -msse4.2 -Wall -std=c99 -g -fopenmp -O3 -o test_simd
@@ -30,4 +32,4 @@ benchLUT : benchLUT.c il2lut.c il2lut.h benchmark.h
 test:	imgtrans.py _imgtrans.$(shlib) test_imgtrans.py
 	python run_bench_omp.py
 	python test_imgtrans.py 
-
+	python test_imgsimple.py | tee img_simple.timing
