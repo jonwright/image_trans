@@ -374,8 +374,8 @@ void log2bytesimd( const uint16_t *restrict in,
     global extn
     print("Wrote C code, calling C compiler")
     sys.stdout.flush()
-    os.system("gcc -shared -fPIC -O3 -fopenmp -march=native -mtune=native -std=c99 -Wall img_simple.c -o _img_simple."+
-              extn )
+#    os.system("gcc -shared -fPIC -O3 -fopenmp -march=native -mtune=native -std=c99 -Wall img_simple.c -o _img_simple."+
+ #             extn )
     # END of generateC
 
 if __name__=="__main__":

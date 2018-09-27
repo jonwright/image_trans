@@ -1,8 +1,9 @@
 
+CC = gcc
 # centos5 ; grr
 # CC=gcc44
 
-CC = gcc
+
 CFLAGS = -std=c99 -fPIC -fopenmp  -O3 -msse4.2 -Wall -o 
 
 
@@ -22,6 +23,9 @@ _imgtrans.$(shlib) : _imgtrans.c Makefile
 
 _img_simple.$(shlib) : img_simple.py
 	python img_simple.py
+	$(CC) img_simple.c  -shared $(CFLAGS) _img_simple.$(shlib)
+
+
 
 test_simd : test_simd.c
 	$(CC) test_simd.c -msse4.2 -Wall -std=c99 -g -fopenmp -O3 -o test_simd
