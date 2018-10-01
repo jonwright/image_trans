@@ -1,8 +1,12 @@
 
 from __future__ import print_function, division
 
-import sps, numpy as np, time, img_simple
+import numpy as np, time, img_simple
 import SocketServer, socket, thread
+try:
+    import sps
+except:
+    pass
 
 class spslocalproxy():
     """  for local """

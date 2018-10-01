@@ -17,6 +17,7 @@ import sps_server
 
 class spslocalwin():
     def __init__( self ):
+        self.cache = {}
 
         self.root = tk.Tk()
 
@@ -44,7 +45,9 @@ class spslocalwin():
         self.frame.pack()
         self.label = tk.Label( self.frame ) 
         self.label.pack()
-        # Tell the server we quit
+        
+        self.onscreen = ""
+        self.root.after( 100, self.changed )
         self.root.mainloop()
 
     def changed(self, *args):
@@ -55,14 +58,19 @@ class spslocalwin():
         
     def checkdata( self, name ):
         print("Checking",name)
-        if self.proxy.isupdated( name ):
-            print("Was updated, rendering")
+        if self.proxy.isupdated( name ) or name not in self.cache:
             data=self.proxy.getdata( name )
-            self.render( data )
+            self.cache[name] = data
+            self.onscreen = ""
         else:
             print("No change")
-        
-    def render(self, binned):
+        self.render( name )    
+#        self.root.after(100, self.changed )
+
+    def render(self, name):
+        if name == self.onscreen:
+            print("Skip render,done" )
+        binned = self.cache[name]
         if self.im is None:
             self.im=Image.frombuffer('P',
                                      (binned.shape[1],
@@ -73,9 +81,11 @@ class spslocalwin():
             self.im.putpalette( self.pal )
             self.photo = ImageTk.PhotoImage(image=self.im)
             self.label.configure( image = self.photo )
+            self.onscreen = name
         else:
             self.im.putdata( binned.astype('b').tostring() )
             self.photo.paste( self.im )
+            self.onscreen = name
             
     
 if __name__ == '__main__':
