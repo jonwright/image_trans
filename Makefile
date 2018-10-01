@@ -1,10 +1,12 @@
 
 CC = gcc
+# CC=clang
 # centos5 ; grr
 # CC=gcc44
 
 
-CFLAGS = -std=c99 -fPIC -fopenmp  -O3 -msse4.2 -Wall -o 
+CFLAGS = -std=c99 -fPIC -fopenmp  -O3 -march=native -Wall -o
+CFLAGS = -std=c99 -fPIC -fopenmp  -O3 -msse4.2 -Wall -o
 
 
 ifeq ($(OS), Windows_NT)

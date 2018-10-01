@@ -152,7 +152,7 @@ void setLUT( int minval, int maxval, int type){
   int i;
   float f,c,cm;
   for(i=0     ; i<=minval; i++) LUT[i]=0;
-  for(i=maxval; i<=65535 ; i++) LUT[i]=255;
+  for(i=maxval; i<=65535 ; i++) LUT[i]=255u;
   if(type == 1){ /* log */
     c = 255./(log(maxval-minval));
     for(i=minval+1; i<maxval; i++){

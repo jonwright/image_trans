@@ -181,7 +181,7 @@ def test_rebins( im ):
         from pylab import imshow, show, subplot, title, colorbar, savefig
         import pylab
         pylab.figure()
-        pylab.spectral()
+#        pylab.spectral()
         subplot(221)
         imshow( im, aspect='equal' )
 #        title( )
